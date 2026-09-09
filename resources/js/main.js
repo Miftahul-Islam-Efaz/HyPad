@@ -815,9 +815,59 @@ function toast(m) {
 }
 
 /* ---------- window: drag, resize edges, controls ---------- */
+let winMaxed = false, preMax = null;
+
+/* Borderless windows have no native maximize that respects the taskbar,
+   so we snap to the monitor work area instead. */
+async function pxScale() {
+  try {
+    const sz = await Neutralino.window.getSize();
+    if (window.outerWidth > 0) {
+      const r = sz.width / window.outerWidth;
+      if (r > 0.2 && r < 5) return r;
+    }
+  } catch (e) {}
+  return window.devicePixelRatio || 1;
+}
+
+async function isMaxed() {
+  if (winMaxed) return true;
+  try { return await Neutralino.window.isMaximized(); } catch (e) { return false; }
+}
+
+async function maximizeToWorkArea() {
+  try {
+    const p = await Neutralino.window.getPosition();
+    const sz = await Neutralino.window.getSize();
+    preMax = { x: p.x, y: p.y, w: sz.width, h: sz.height };
+    const k = await pxScale();
+    const sc = window.screen;
+    const x = Math.round((sc.availLeft || 0) * k);
+    const y = Math.round((sc.availTop || 0) * k);
+    const w = Math.round(sc.availWidth * k);
+    const h = Math.round(sc.availHeight * k);
+    await Neutralino.window.move(x, y);
+    await Neutralino.window.setSize({ width: w, height: h });
+    winMaxed = true;
+  } catch (e) {}
+}
+
+async function restoreWindow() {
+  try {
+    if (await Neutralino.window.isMaximized()) await Neutralino.window.unmaximize();
+  } catch (e) {}
+  try {
+    if (preMax) {
+      await Neutralino.window.setSize({ width: preMax.w, height: preMax.h });
+      await Neutralino.window.move(preMax.x, preMax.y);
+    }
+  } catch (e) {}
+  winMaxed = false;
+}
+
 async function syncMaxIcon() {
   try {
-    const m = await Neutralino.window.isMaximized();
+    const m = await isMaxed();
     $('maxUse').setAttribute('href', m ? '#i-restore' : '#i-max');
     document.body.classList.toggle('maximized', m);
   } catch (e) {}
@@ -826,13 +876,9 @@ async function syncMaxIcon() {
 function initWindow() {
   $('btnMin').onclick = () => Neutralino.window.minimize();
   $('btnMax').onclick = async () => {
-    try {
-      (await Neutralino.window.isMaximized())
-        ? await Neutralino.window.unmaximize()
-        : await Neutralino.window.maximize();
-    } catch (e) {}
+    (await isMaxed()) ? await restoreWindow() : await maximizeToWorkArea();
     syncMaxIcon();
-  setHistMin(st.histMin !== false);
+    setHistMin(st.histMin !== false);
   };
   $('btnClose').onclick = async () => { await persist(); Neutralino.app.exit(); };
   $('btnPinTop').onclick = async e => {
@@ -847,6 +893,7 @@ function initWindow() {
   let dragOrigin = null;
   $('drag').addEventListener('pointerdown', async e => {
     if (e.target.closest('button') || e.target.closest('input')) return;
+    if (winMaxed) { winMaxed = false; preMax = null; syncMaxIcon(); }
     try {
       const p = await Neutralino.window.getPosition();
       dragOrigin = { sx: e.screenX, sy: e.screenY, wx: p.x, wy: p.y };
@@ -872,6 +919,7 @@ function initWindow() {
     let o = null;
     zone.addEventListener('pointerdown', async e => {
       e.preventDefault();
+      if (winMaxed) { winMaxed = false; preMax = null; syncMaxIcon(); }
       try {
         const p = await Neutralino.window.getPosition();
         const s = await Neutralino.window.getSize();

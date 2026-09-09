@@ -15,3 +15,5 @@ neutralino.js
 fixmeta*
 patch*.js
 ghrel.ps1
+node_modules/
+makeico.js

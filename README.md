@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb" />
-  <img alt="Size" src="https://img.shields.io/badge/installer-1.2%20MB-2ea44f" />
+  <img alt="Size" src="https://img.shields.io/badge/installer-3.1%20MB-2ea44f" />
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blueviolet" />
 </p>
 
@@ -38,11 +38,12 @@ It uses the system WebView instead of bundling a browser runtime, so the whole a
 
 ## Install
 
-1. Download **[HyPad-Setup.exe](https://github.com/Miftahul-Islam-Efaz/HyPad/releases/latest/download/HyPad-Setup.exe)** (1.2 MB) from the [latest release](../../releases/latest).
-2. Double-click it and confirm the prompt.
+1. Download **[HyPad-Setup.exe](https://github.com/Miftahul-Islam-Efaz/HyPad/releases/latest/download/HyPad-Setup.exe)** (3.1 MB) from the [latest release](../../releases/latest).
+2. Double-click it and follow the setup wizard.
 
-That is the whole installation. Setup registers HyPad the way any Windows app
-does: it installs to `%LOCALAPPDATA%\Programs\HyPad`, adds a **Start menu
+A standard Windows setup wizard opens, with a license page, an install-location
+page and options for a desktop shortcut and file associations. Setup registers
+HyPad the way any Windows app does: it installs to `%LOCALAPPDATA%\Programs\HyPad`, adds a **Start menu
 shortcut** so HyPad appears in the Windows app list and in search, lists itself
 under **Settings → Apps → Installed apps** with a working uninstaller, and adds
 HyPad to the **Open with** menu for text files. No admin rights are required.
