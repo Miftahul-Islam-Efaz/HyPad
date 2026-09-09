@@ -1,0 +1,61 @@
+/* ===== Soft rounded look + light theme (loaded after styles.css) ===== */
+:root{
+  --r:18px; --r-sm:12px; --r-xs:9px;
+  --shadow:0 24px 60px rgba(0,0,0,.45);
+}
+html,body{background:transparent}
+#shell{
+  border-radius:var(--r);
+  box-shadow:var(--shadow);
+  margin:0;
+}
+
+/* softer, chunkier controls everywhere */
+.ic{border-radius:var(--r-sm)}
+.tab{border-radius:var(--r-sm) var(--r-sm) 0 0;padding:6px 10px}
+#toolbar button{border-radius:var(--r-sm);height:28px}
+#noteSearch,.note{border-radius:var(--r-sm)}
+#findbar input[type=text]{border-radius:var(--r-sm)}
+#editor{border-radius:var(--r-sm)}
+#preview,#history{border-radius:var(--r-sm)}
+#toast{border-radius:999px}
+.hrow{border-radius:var(--r-xs)}
+
+/* ===== LIGHT THEME (Wispr Scratchpad style: warm white, soft grey lines) ===== */
+:root[data-theme="light"]{
+  --bg:#fbfbfd;
+  --bg2:#f2f2f6;
+  --bg3:#e8e8ef;
+  --line:#e0e0e8;
+  --fg:#1d1d21;
+  --fg2:#6b6b78;
+  --acc:#6c5cff;
+  --acc2:#12b886;
+  --danger:#ff5f57;
+  --shadow:0 24px 60px rgba(20,20,40,.16);
+}
+:root[data-theme="light"] #shell{border-color:var(--line)}
+:root[data-theme="light"] #editor{background:var(--bg);color:var(--fg)}
+:root[data-theme="light"] #editor::selection{background:#ddd8ff}
+:root[data-theme="light"] .tab.active{background:var(--bg);border-bottom-color:var(--bg)}
+:root[data-theme="light"] #toolbar button.on{color:#fff}
+:root[data-theme="light"] #preview code,
+:root[data-theme="light"] #preview pre{background:var(--bg3)}
+:root[data-theme="light"] #toast{background:#1d1d21;color:#fff}
+:root[data-theme="light"] ::-webkit-scrollbar-thumb{background:#cfcfda}
+
+/* dark theme keeps styles.css values, just deepened a touch */
+:root[data-theme="dark"]{
+  --bg:#16161a;--bg2:#1d1d22;--bg3:#26262d;--line:#31313a;
+}
+
+/* scrollbars, soft */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#3a3a45;border-radius:999px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#4a4a58;background-clip:content-box}
+
+/* gentle transitions between themes */
+#shell,#titlebar,#tabstrip,#sidebar,#toolbar,#editor,#status,.tab,.note,#toolbar button,.ic{
+  transition:background-color .18s ease,color .18s ease,border-color .18s ease;
+}
