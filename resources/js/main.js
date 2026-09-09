@@ -102,16 +102,179 @@ ed.setSelectionRange = (a, b) => {
 };
 
 /* link cards: clickable, not editable, deletable as a single unit */
+const CARD_W = 294;
 function hydrateCards() {
   ed.querySelectorAll('.lcard').forEach(c => {
     c.setAttribute('contenteditable', 'false');
     if (!c.dataset.url) c.dataset.url = c.getAttribute('href') || '';
+
+    // cards written by an older build were block level and 420px wide
+    if (c.classList.contains('media')) {
+      const w = parseInt(c.style.width, 10);
+      if (!w || w > 400) c.style.width = CARD_W + 'px';
+    }
+    c.style.display = 'inline-block';
+    c.style.verticalAlign = 'bottom';
+
+    // lift a card out of its own empty wrapper so it joins the text above
+    const p = c.parentElement;
+    if (p && p !== ed && /^(DIV|P)$/.test(p.tagName)) {
+      const meaningful = Array.from(p.childNodes).filter(n =>
+        n !== c && !(n.nodeType === 3 && !n.nodeValue.trim()) && !(n.nodeType === 1 && n.tagName === 'BR'));
+      if (!meaningful.length) {
+        const prev = p.previousElementSibling;
+        if (prev && /^(DIV|P|H1|H2|H3|LI|BLOCKQUOTE)$/.test(prev.tagName)) {
+          prev.appendChild(document.createTextNode('\u200b'));
+          prev.appendChild(c);
+          p.remove();
+        }
+      }
+    }
+
+    // caret anchors on both sides so you can type right before or after it
+    c.setAttribute('draggable', 'true');
+    const anchor = side => {
+      const n = side === 'before' ? c.previousSibling : c.nextSibling;
+      if (!n || n.nodeType !== 3) {
+        c.parentNode.insertBefore(document.createTextNode('\u200b'),
+          side === 'before' ? c : c.nextSibling);
+      }
+    };
+    anchor('before'); anchor('after');
   });
 }
+/* drag the bottom-right grip to resize a preview; the width is inline,
+   so it is stored with the note and survives restarts */
+let rszTarget = null, rszStart = null;
+function initResize() {
+  // arrow keys should step over a preview like a single character
+  ed.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    const side = e.key === 'ArrowRight' ? r.endContainer.nextSibling : r.startContainer.previousSibling;
+    if (side && side.nodeType === 1 && side.classList && side.classList.contains('lcard')) {
+      e.preventDefault();
+      const t = document.createTextNode('');
+      side.parentNode.insertBefore(t, e.key === 'ArrowRight' ? side.nextSibling : side);
+      const nr = document.createRange(); nr.setStart(t, 0); nr.collapse(true);
+      sel.removeAllRanges(); sel.addRange(nr);
+    }
+  });
+  ed.addEventListener('pointerdown', e => {
+    const grip = e.target.closest('.rsz');
+    if (!grip) return;
+    const fig = grip.closest('.media');
+    if (!fig) return;
+    e.preventDefault(); e.stopPropagation();
+    rszTarget = fig;
+    rszStart = { x: e.clientX, w: fig.getBoundingClientRect().width };
+    grip.setPointerCapture(e.pointerId);
+    fig.classList.add('resizing');
+  });
+  ed.addEventListener('pointermove', e => {
+    if (!rszTarget) return;
+    const max = ed.clientWidth - 60;
+    const w = Math.max(72, Math.min(max, rszStart.w + (e.clientX - rszStart.x)));
+    rszTarget.style.width = Math.round(w) + 'px';
+  });
+  const endRsz = () => {
+    if (!rszTarget) return;
+    rszTarget.classList.remove('resizing');
+    rszTarget = null;
+    markDirty();
+  };
+  ed.addEventListener('pointerup', endRsz);
+  ed.addEventListener('pointercancel', endRsz);
+  // double-click a preview to cycle small / medium / full width
+  ed.addEventListener('dblclick', e => {
+    const fig = e.target.closest('.media');
+    if (!fig) return;
+    e.preventDefault();
+    const steps = [96, 160, 294, 440, Math.max(294, ed.clientWidth - 60)];
+    const cur = fig.getBoundingClientRect().width;
+    const next = steps.find(s => s > cur + 8) || steps[0];
+    fig.style.width = Math.round(next) + 'px';
+    markDirty();
+  });
+}
+
+/* pointer-driven drag: pick a preview up and drop it into the text.
+   HTML5 drag never fired reliably inside contenteditable, so the mouse-up
+   landed as a plain click and opened the link instead of moving the card. */
+let dragCard = null, dragFrom = null, dragMoved = false, dragBlockClick = 0;
+function pointRange(x, y) {
+  let range = null;
+  if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(x, y);
+  else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(x, y);
+    if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
+  }
+  return range;
+}
+function showDropMark(x, y) {
+  ed.querySelectorAll('.dropMark').forEach(m => m.remove());
+  const r = pointRange(x, y);
+  if (!r || !ed.contains(r.startContainer) || dragCard.contains(r.startContainer)) return null;
+  r.collapse(true);
+  const mark = document.createElement('span');
+  mark.className = 'dropMark';
+  mark.setAttribute('contenteditable', 'false');
+  r.insertNode(mark);
+  return mark;
+}
+function initCardDrag() {
+  ed.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('.lcard')) e.preventDefault(); });
+
+  ed.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.rsz')) return;
+    const c = e.target.closest('.lcard');
+    if (!c) return;
+    dragCard = c; dragMoved = false;
+    dragFrom = { x: e.clientX, y: e.clientY };
+    try { ed.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  ed.addEventListener('pointermove', e => {
+    if (!dragCard || !dragFrom) return;
+    if (Math.abs(e.clientX - dragFrom.x) <= 5 && Math.abs(e.clientY - dragFrom.y) <= 5) return;
+    if (!dragMoved) { dragMoved = true; dragCard.classList.add('dragging'); ed.classList.add('dropping'); }
+    showDropMark(e.clientX, e.clientY);
+  });
+
+  const endDrag = () => {
+    if (!dragCard) return;
+    const card = dragCard, moved = dragMoved;
+    dragCard = null; dragFrom = null; dragMoved = false;
+    card.classList.remove('dragging');
+    ed.classList.remove('dropping');
+    const mark = ed.querySelector('.dropMark');
+    if (moved && mark) {
+      dragBlockClick = Date.now();
+      mark.parentNode.insertBefore(card, mark);
+      mark.remove();
+      hydrateCards();
+      const after = card.nextSibling;
+      if (after && after.nodeType === 3) {
+        const r = document.createRange();
+        r.setStart(after, Math.min(1, after.nodeValue.length)); r.collapse(true);
+        const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      }
+      markDirty(); updateStatus();
+      toast('Preview moved');
+    }
+    ed.querySelectorAll('.dropMark').forEach(m => m.remove());
+  };
+  ed.addEventListener('pointerup', endDrag);
+  ed.addEventListener('pointercancel', endDrag);
+}
+
 function insertCardFor(url) {
   const cardHtml = linkCard(esc(url));
   if (!cardHtml) return false;
-  document.execCommand('insertHTML', false, cardHtml + '<div><br></div>');
+  document.execCommand('insertHTML', false, cardHtml + '&nbsp;');
   hydrateCards();
   return true;
 }
@@ -316,24 +479,65 @@ function typeIn(text, from, to) {
   if (from !== undefined) ed.setSelectionRange(from, to === undefined ? from : to);
   try { document.execCommand('insertText', false, text); } catch (e) {}
 }
-const cmd = (name, val) => { ed.focus(); document.execCommand(name, false, val); markDirty(); updateStatus(); };
-function toggleBlock(tag) {
+/* remember the selection so a toolbar click always formats the text
+   the user had highlighted, exactly like a word processor */
+let lastRange = null;
+function rememberSelection() {
+  const s = window.getSelection();
+  if (s && s.rangeCount && ed.contains(s.anchorNode)) lastRange = s.getRangeAt(0).cloneRange();
+}
+function restoreSelection() {
   ed.focus();
+  const s = window.getSelection();
+  // a live caret or selection inside the editor always wins over the saved one
+  if (s && s.rangeCount && ed.contains(s.anchorNode)) return;
+  if (!lastRange || !ed.contains(lastRange.commonAncestorContainer)) return;
+  s.removeAllRanges(); s.addRange(lastRange);
+}
+try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+const cmd = (name, val) => {
+  restoreSelection();
+  document.execCommand(name, false, val);
+  rememberSelection();
+  markDirty(); updateStatus(); syncToolbar();
+};
+
+/* reflect the state of the caret in the toolbar (bold looks pressed, etc.) */
+function syncToolbar() {
+  const states = { bold: 'bold', italic: 'italic', strike: 'strikeThrough' };
+  for (const key in states) {
+    const b = document.querySelector('#toolbar [data-md="' + key + '"]');
+    if (!b) continue;
+    let on = false;
+    try { on = document.queryCommandState(states[key]); } catch (e) {}
+    b.classList.toggle('on', on);
+  }
+  let node = window.getSelection() && window.getSelection().anchorNode;
+  while (node && node !== ed && !(node.tagName && /^(H1|H2|H3|BLOCKQUOTE|LI|CODE)$/.test(node.tagName))) node = node.parentNode;
+  const tag = node && node.tagName ? node.tagName.toLowerCase() : '';
+  [['h1', 'h1'], ['h2', 'h2'], ['h3', 'h3'], ['quote', 'blockquote'], ['code', 'code']].forEach(([k, t]) => {
+    const b = document.querySelector('#toolbar [data-md="' + k + '"]');
+    if (b) b.classList.toggle('on', tag === t);
+  });
+}
+function toggleBlock(tag) {
+  restoreSelection();
   const sel = window.getSelection();
   let node = sel.anchorNode;
   while (node && node !== ed && (!node.tagName || !/^(H[1-6]|P|DIV|BLOCKQUOTE|LI)$/.test(node.tagName))) node = node.parentNode;
   const cur = node && node.tagName ? node.tagName.toLowerCase() : '';
   document.execCommand('formatBlock', false, cur === tag ? 'div' : tag);
-  markDirty(); updateStatus();
+  rememberSelection();
+  markDirty(); updateStatus(); syncToolbar();
 }
 function wrapSel(pre, post) {   // kept for Tab and programmatic edits
   typeIn(pre + (post ? '' : ''), ed.selectionStart, ed.selectionEnd);
   markDirty(); updateStatus();
 }
 function inlineCode() {
+  restoreSelection();
   const sel = window.getSelection();
   const text = sel ? sel.toString() : '';
-  ed.focus();
   document.execCommand('insertHTML', false, '<code>' + (esc(text) || '&nbsp;') + '</code>&nbsp;');
   markDirty(); updateStatus();
 }
@@ -399,8 +603,8 @@ function autoFormat() {
     document.execCommand('insertHTML', false,
       '<a href="' + esc(url) + '">' + esc(url) + '</a>&nbsp;');
     const card = linkCard(esc(url));
-    if (card && /youtu\.be|youtube\.com|vimeo\.com/.test(url)) {
-      document.execCommand('insertHTML', false, '<div><br></div>' + card + '<div><br></div>');
+    if (card && (/youtu\.be|youtube\.com|vimeo\.com/.test(url) || isImageUrl(url))) {
+      document.execCommand('insertHTML', false, card + '&nbsp;');
       hydrateCards();
     }
   }
@@ -424,21 +628,42 @@ function ytId(u) {
   return m ? m[1] : null;
 }
 function vimeoId(u) { const m = u.match(/vimeo\.com\/(\d+)/); return m ? m[1] : null; }
+const IMG_RX = /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|#|$)/i;
+function isImageUrl(u) {
+  return IMG_RX.test(u) || /(images\.unsplash\.com|i\.imgur\.com|pbs\.twimg\.com\/media|cdn\.discordapp\.com\/attachments)/i.test(u);
+}
 function linkCard(raw) {
   const u = unesc(raw);
   let host = '';
   try { host = new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return null; }
-  const y = ytId(u), v = vimeoId(u);
+  const y = ytId(u), v = vimeoId(u), isImg = isImageUrl(u);
+
+  // a link to an image previews the image itself
+  if (isImg) {
+    return '<figure class="lcard media img" contenteditable="false" data-url="' + raw + '" style="width:294px">' +
+      '<img class="mimg" src="' + raw + '" alt="" loading="lazy" />' +
+      '<span class="rsz" title="Drag to resize"></span>' +
+      '<figcaption class="lh">' + esc(host) + '</figcaption></figure>';
+  }
+
+  // a link to a video previews its thumbnail
   let thumb = '';
   if (y) thumb = 'https://i.ytimg.com/vi/' + y + '/hqdefault.jpg';
   else if (v) thumb = 'https://vumbnail.com/' + v + '.jpg';
-  const fav = 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(host);
-  const media = thumb
-    ? '<span class="lthumb"><img src="' + thumb + '" alt="" loading="lazy" /><span class="lplay"></span></span>'
-    : '<span class="lfav"><img src="' + fav + '" alt="" loading="lazy" /></span>';
+  if (thumb) {
+    return '<figure class="lcard media wide" contenteditable="false" data-url="' + raw + '" style="width:294px">' +
+      '<span class="lthumb"><img src="' + thumb + '" alt="" loading="lazy" /><span class="lplay"></span></span>' +
+      '<span class="lmeta"><span class="lt">' + esc(host === 'youtu.be' ? 'YouTube video' : host) + '</span>' +
+      '<span class="lh">' + esc(u.slice(0, 90)) + '</span></span>' +
+      '<span class="rsz" title="Drag to resize"></span></figure>';
+  }
+
+  // anything else: a compact site card
   let path = '';
   try { path = decodeURIComponent(new URL(u).pathname).replace(/^\/|\/$/g, '') || host; } catch (e) { path = host; }
-  return '<a class="lcard' + (thumb ? ' wide' : '') + '" href="' + raw + '">' + media +
+  const fav = 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(host);
+  return '<a class="lcard" contenteditable="false" data-url="' + raw + '" href="' + raw + '">' +
+    '<span class="lfav"><img src="' + fav + '" alt="" loading="lazy" /></span>' +
     '<span class="lmeta"><span class="lt">' + esc(path.slice(0, 120)) + '</span>' +
     '<span class="lh">' + esc(host) + '</span></span></a>';
 }
@@ -697,8 +922,12 @@ function wire() {
     markDirty(); updateStatus();
     if (!$('preview').hidden) doPreview(true);
   });
-  ed.addEventListener('keyup', updateStatus);
+  ed.addEventListener('keyup', () => { updateStatus(); rememberSelection(); syncToolbar(); });
+  ed.addEventListener('mouseup', () => { rememberSelection(); syncToolbar(); });
   ed.addEventListener('click', updateStatus);
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement === ed) { rememberSelection(); syncToolbar(); }
+  });
   ed.addEventListener('keydown', e => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -713,8 +942,8 @@ function wire() {
     const url = text.trim();
     if (/^https?:\/\/\S+$/.test(url)) {
       document.execCommand('insertHTML', false, '<a href="' + esc(url) + '">' + esc(url) + '</a>');
-      if (/youtu\.be|youtube\.com|vimeo\.com/.test(url)) insertCardFor(url);
-      else { const c = linkCard(esc(url)); if (c) { document.execCommand('insertHTML', false, '<div><br></div>' + c + '<div><br></div>'); hydrateCards(); } }
+      const c = linkCard(esc(url));
+      if (c) { document.execCommand('insertHTML', false, c + '&nbsp;'); hydrateCards(); }
     } else {
       document.execCommand('insertText', false, text);
     }
@@ -722,6 +951,7 @@ function wire() {
   });
   // Ctrl+click or click on a card opens the link in the browser
   ed.addEventListener('click', async e => {
+    if (Date.now() - dragBlockClick < 400) return;
     const card = e.target.closest('.lcard');
     const a = e.target.closest('a[href^="http"]');
     const url = card ? card.dataset.url : (a && (e.ctrlKey || e.metaKey) ? a.getAttribute('href') : null);
@@ -730,8 +960,8 @@ function wire() {
     try { await Neutralino.os.open(url); } catch (err) { toast('Could not open link'); }
   });
   document.querySelectorAll('#toolbar [data-md]').forEach(b => {
-    b.addEventListener('mousedown', e => e.preventDefault()); // keep textarea selection
-    b.onclick = () => MD[b.dataset.md]();
+    b.addEventListener('mousedown', e => e.preventDefault()); // keep the highlighted text selected
+    b.onclick = () => { MD[b.dataset.md](); syncToolbar(); };
   });
   $('btnNewTab').onclick = addTab;
   $('btnSidebar').onclick = () => {
@@ -770,13 +1000,11 @@ function wire() {
     if (!h.hidden) renderHistory();
     syncHistPad();
   };
-  $('histClose').onclick = () => {
-    $('history').hidden = true; $('btnHistory').classList.remove('on'); syncHistPad();
-  };
+  // the panel is closed from the History toolbar button; the rail handles collapsing
   const setHistMin = (min) => {
     st.histMin = min;
     $('history').classList.toggle('min', min);
-    $('histMinUse').setAttribute('href', min ? '#i-down' : '#i-up');
+    $('histMinUse').setAttribute('href', '#i-panel');
     $('histMin').title = min ? 'Expand history' : 'Minimize history';
     syncHistPad();
   };
@@ -805,7 +1033,8 @@ function wire() {
       n: addTab, t: addTab, w: () => closeTab(st.active),
       s: () => saveFile(e.shiftKey), o: openFile,
       f: () => toggleFind(true), h: () => $('btnHistory').click(),
-      p: () => doPreview(), b: () => $('btnSidebar').click(),
+      p: () => doPreview(),
+      '\\': () => $('btnSidebar').click(),
       d: () => { snapshot(); persist(); toast('Snapshot saved'); },
       '0': () => setZoom(100), '=': () => setZoom(st.zoom + 10),
       '+': () => setZoom(st.zoom + 10), '-': () => setZoom(st.zoom - 10)
@@ -819,6 +1048,8 @@ function wire() {
   await restore();
   initWindow();
   wire();
+  initResize();
+  initCardDrag();
   $('sidebar').classList.toggle('hidden', !st.sidebar);
   $('btnSidebar').classList.toggle('on', st.sidebar);
   $('btnPinTop').classList.toggle('on', st.onTop);

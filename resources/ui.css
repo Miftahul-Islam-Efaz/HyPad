@@ -191,7 +191,13 @@ button:active .gl { transform: scale(.9); }
   position: static; flex: 0 0 auto; width: min(262px, 42%);
   align-self: stretch; box-shadow: none; border-left: 1px solid var(--line);
 }
-#history.min { height: 40px; align-self: flex-start; }
+/* collapse horizontally into a slim rail on the right edge */
+#history.min { width: 38px; height: auto; align-self: stretch; }
+#history.min #histList,
+#history.min #historyHead > span,
+#history.min #histClose { display: none; }
+#history.min #historyHead { padding: 5px 0; justify-content: center; }
+#history.min #histMin { transform: rotate(180deg); }
 @media (max-width: 560px) { #history { width: 46%; } }
 
 /* ---------- rendered content inside the editor ---------- */
@@ -252,3 +258,88 @@ button:active .gl { transform: scale(.9); }
 .lcard.wide .lmeta { padding: 10px 13px 12px; }
 .lt { font: 600 13px/1.35 var(--font-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lh { font: 11.5px/1.3 var(--font-ui); color: var(--fg2); }
+
+/* ---------- media previews: resizable video / image cards ---------- */
+#editor .media, #preview .media {
+  position: relative; display: block; margin: 14px 0; padding: 0;
+  max-width: 100%; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg2); overflow: hidden; cursor: pointer;
+  transition: border-color .16s, box-shadow .16s;
+}
+#editor .media:hover { border-color: var(--acc); }
+#editor .media.resizing { border-color: var(--acc); box-shadow: 0 0 0 2px var(--sel); }
+#editor .media.img { line-height: 0; }
+#editor .media .mimg { width: 100%; height: auto; display: block; }
+#editor .media figcaption {
+  padding: 7px 11px; line-height: 1.3; background: var(--bg2);
+  font: 11.5px var(--font-ui); color: var(--fg2);
+}
+#editor .media.wide { display: block; }
+#editor .media.wide .lthumb { display: block; width: 100%; aspect-ratio: 16/9; }
+#editor .media.wide .lmeta { display: flex; flex-direction: column; gap: 2px; padding: 9px 12px 11px; }
+
+/* the resize grip */
+#editor .rsz {
+  position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px;
+  border-radius: 5px; background: var(--bg3); border: 1px solid var(--line);
+  cursor: nwse-resize; opacity: 0; transition: opacity .15s;
+}
+#editor .media:hover .rsz, #editor .media.resizing .rsz { opacity: 1; }
+#editor .rsz::after {
+  content: ''; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px;
+  border-right: 2px solid var(--fg2); border-bottom: 2px solid var(--fg2);
+}
+#preview .rsz { display: none; }
+
+/* toolbar pressed state */
+#toolbar .tb.on, #toolbar button.on { background: var(--sel); color: var(--acc); }
+
+/* ---------- previews behave like text: they sit on the line ---------- */
+#editor .media, #preview .media {
+  display: inline-block; vertical-align: bottom;
+  margin: 2px 6px 2px 0; width: 294px; max-width: 100%;
+}
+#editor .lcard:not(.media) { display: inline-flex; vertical-align: middle; margin: 2px 6px 2px 0; max-width: 320px; }
+#historyHead #histMin { transition: transform .2s var(--ease-out); }
+
+/* ---------- inline preview sizing: a preview is just a big character ---------- */
+#editor .media,
+#editor .media.wide,
+#editor .media.img,
+#preview .media {
+  display: inline-block !important;
+  vertical-align: bottom;
+  width: 294px; max-width: 100%;
+  margin: 3px 6px 3px 0;
+}
+#editor .lcard:not(.media) {
+  display: inline-flex !important; vertical-align: middle;
+  margin: 2px 6px 2px 0; max-width: 300px; padding: 7px 10px;
+}
+#editor .media.wide .lmeta { padding: 7px 10px 9px; }
+#editor .media .lt { font-size: 12.5px; }
+#editor .media .lh { font-size: 11px; }
+#editor .media figcaption { padding: 6px 10px; }
+
+/* ---------- draggable previews ---------- */
+#editor .lcard { cursor: grab; }
+#editor .lcard.dragging { opacity: .45; cursor: grabbing; }
+#editor .lcard .rsz { cursor: nwse-resize; }
+#editor { white-space: pre-wrap; }
+#histClose { display: none; }
+#history.min #historyHead { padding: 5px 0; }
+
+/* ---------- small previews, drop marker ---------- */
+#editor .media, #editor .media.wide, #editor .media.img { min-width: 72px; }
+#editor .media .lmeta, #editor .media .lt, #editor .media .lh { min-width: 0; }
+/* the long URL text used to set a floor on how narrow a card could get */
+#editor .media .lt, #editor .media .lh {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#editor .lcard.dragging { opacity: .4; }
+#editor.dropping, #editor.dropping * { cursor: grabbing !important; }
+#editor .dropMark {
+  display: inline-block; width: 2px; height: 1.1em; vertical-align: text-bottom;
+  background: var(--acc); border-radius: 1px; animation: dropPulse .7s infinite;
+}
+@keyframes dropPulse { 50% { opacity: .35; } }
