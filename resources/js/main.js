@@ -146,7 +146,7 @@ function renderHistory() {
     el.querySelector('.hw').textContent = new Date(v.at).toLocaleString();
     el.title = 'Restore this version';
     el.onclick = () => {
-      snapshot(); t.text = v.text; ed.value = v.text;
+      snapshot(); t.text = v.text; typeIn(v.text, 0, ed.value.length);
       markDirty(); updateStatus(); renderHistory(); toast('Version restored');
     };
     box.appendChild(el);
@@ -200,10 +200,31 @@ function closeTab(id) {
 }
 
 /* ---------- markdown ---------- */
+// undo-safe replacement: routes through execCommand so Ctrl+Z / Ctrl+Y work
+function typeIn(text, from, to) {
+  ed.focus();
+  if (from !== undefined) ed.setSelectionRange(from, to === undefined ? from : to);
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch (err) { ok = false; }
+  if (!ok) {
+    const s = ed.selectionStart, e = ed.selectionEnd, v = ed.value;
+    ed.value = v.slice(0, s) + text + v.slice(e);
+    ed.setSelectionRange(s + text.length, s + text.length);
+    ed.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
 function wrapSel(pre, post) {
   const s = ed.selectionStart, e = ed.selectionEnd, v = ed.value;
-  ed.value = v.slice(0, s) + pre + v.slice(s, e) + post + v.slice(e);
-  ed.focus(); ed.setSelectionRange(s + pre.length, e + pre.length);
+  const inner = v.slice(s, e);
+  // toggle off when the selection is already wrapped
+  if (post && inner.startsWith(pre) && inner.endsWith(post) && inner.length >= pre.length + post.length) {
+    const stripped = inner.slice(pre.length, inner.length - post.length);
+    typeIn(stripped, s, e);
+    ed.setSelectionRange(s, s + stripped.length);
+  } else {
+    typeIn(pre + inner + post, s, e);
+    ed.setSelectionRange(s + pre.length, s + pre.length + inner.length);
+  }
   markDirty(); updateStatus();
 }
 function linePrefix(prefix, numbered) {
@@ -212,8 +233,9 @@ function linePrefix(prefix, numbered) {
   let b = v.indexOf('\n', e); if (b < 0) b = v.length;
   const rx = /^(\s*)(?:[-*]\s\[[ x]\]\s|[-*]\s|\d+\.\s|>\s|#{1,6}\s)?/;
   const out = v.slice(a, b).split('\n').map((ln, i) => ln.replace(rx, (m, w) => w + (numbered ? (i + 1) + '. ' : prefix)));
-  ed.value = v.slice(0, a) + out.join('\n') + v.slice(b);
-  ed.focus(); ed.setSelectionRange(a, a + out.join('\n').length);
+  const joined = out.join('\n');
+  typeIn(joined, a, b);
+  ed.setSelectionRange(a, a + joined.length);
   markDirty(); updateStatus();
 }
 const MD = {
@@ -231,13 +253,42 @@ function inline(s) {
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|\W)\*([^*]+)\*/g, '$1<i>$2</i>')
     .replace(/~~([^~]+)~~/g, '<s>$1</s>')
-    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2">$1</a>')
+    // bare URLs become links, but never re-link one already inside an href
+    .replace(/(^|[\s(])(https?:\/\/[^\s<>"')]+)/g, (m, p, u) => p + '<a href="' + u + '">' + u + '</a>');
+}
+
+/* ---------- link cards ---------- */
+const unesc = s => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+function ytId(u) {
+  let m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+function vimeoId(u) { const m = u.match(/vimeo\.com\/(\d+)/); return m ? m[1] : null; }
+function linkCard(raw) {
+  const u = unesc(raw);
+  let host = '';
+  try { host = new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return null; }
+  const y = ytId(u), v = vimeoId(u);
+  let thumb = '';
+  if (y) thumb = 'https://i.ytimg.com/vi/' + y + '/hqdefault.jpg';
+  else if (v) thumb = 'https://vumbnail.com/' + v + '.jpg';
+  const fav = 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(host);
+  const media = thumb
+    ? '<span class="lthumb"><img src="' + thumb + '" alt="" loading="lazy" /><span class="lplay"></span></span>'
+    : '<span class="lfav"><img src="' + fav + '" alt="" loading="lazy" /></span>';
+  let path = '';
+  try { path = decodeURIComponent(new URL(u).pathname).replace(/^\/|\/$/g, '') || host; } catch (e) { path = host; }
+  return '<a class="lcard' + (thumb ? ' wide' : '') + '" href="' + raw + '">' + media +
+    '<span class="lmeta"><span class="lt">' + esc(path.slice(0, 120)) + '</span>' +
+    '<span class="lh">' + esc(host) + '</span></span></a>';
 }
 function mdToHtml(src) {
   return esc(src).split(/\n{2,}/).map(b => {
     const t = b.trim(); if (!t) return '';
     if (/^```/.test(t)) return `<pre><code>${t.replace(/^```\w*\n?|```$/g, '')}</code></pre>`;
     if (/^(---|\*\*\*)$/.test(t)) return '<hr />';
+    if (/^https?:\/\/\S+$/.test(t)) { const c = linkCard(t); if (c) return c; }
     const h = t.match(/^(#{1,6})\s+(.*)$/);
     if (h) return `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`;
     if (/^&gt;\s/.test(t)) return `<blockquote>${inline(t.replace(/^&gt;\s?/gm, ''))}</blockquote>`;
@@ -463,11 +514,10 @@ function wire() {
         e.preventDefault();
         if (line.trim() === m[0].trim()) {
           const a = v.lastIndexOf('\n', s - 1) + 1;
-          ed.value = v.slice(0, a) + v.slice(s); ed.setSelectionRange(a, a);
+          typeIn('', a, s);
         } else {
           const next = m[3] ? m[1] + (parseInt(m[3], 10) + 1) + '. ' : m[1] + m[2].replace(/\[x\]/i, '[ ]');
-          ed.value = v.slice(0, s) + '\n' + next + v.slice(s);
-          ed.setSelectionRange(s + 1 + next.length, s + 1 + next.length);
+          typeIn('\n' + next, s, s);
         }
         markDirty(); updateStatus();
       }
@@ -475,7 +525,10 @@ function wire() {
     if (e.key === 'Tab') { e.preventDefault(); wrapSel('\t', ''); }
   });
 
-  document.querySelectorAll('#toolbar [data-md]').forEach(b => b.onclick = () => MD[b.dataset.md]());
+  document.querySelectorAll('#toolbar [data-md]').forEach(b => {
+    b.addEventListener('mousedown', e => e.preventDefault()); // keep textarea selection
+    b.onclick = () => MD[b.dataset.md]();
+  });
   $('btnNewTab').onclick = addTab;
   $('btnSidebar').onclick = () => {
     st.sidebar = !st.sidebar;
@@ -494,19 +547,34 @@ function wire() {
     if (e.key === 'Enter') { e.preventDefault(); findNext(e.shiftKey ? -1 : 1); }
     if (e.key === 'Escape') toggleFind();
   });
+  $('preview').addEventListener('click', async e => {
+    const a = e.target.closest('a[href^="http"]');
+    if (!a) return;
+    e.preventDefault();
+    try { await Neutralino.os.open(a.getAttribute('href')); } catch (err) { toast('Could not open link'); }
+  });
   $('btnPreview').onclick = () => doPreview();
+  function syncHistPad() {
+    const h = $('history');
+    $('editorWrap').classList.toggle('histOpen', !h.hidden && !h.classList.contains('min'));
+    $('editorWrap').classList.toggle('histBar', !h.hidden && h.classList.contains('min'));
+  }
   $('btnHistory').onclick = () => {
     const h = $('history');
     h.hidden = !h.hidden;
     $('btnHistory').classList.toggle('on', !h.hidden);
     if (!h.hidden) renderHistory();
+    syncHistPad();
   };
-  $('histClose').onclick = () => { $('history').hidden = true; $('btnHistory').classList.remove('on'); };
+  $('histClose').onclick = () => {
+    $('history').hidden = true; $('btnHistory').classList.remove('on'); syncHistPad();
+  };
   const setHistMin = (min) => {
     st.histMin = min;
     $('history').classList.toggle('min', min);
     $('histMinUse').setAttribute('href', min ? '#i-down' : '#i-up');
     $('histMin').title = min ? 'Expand history' : 'Minimize history';
+    syncHistPad();
   };
   $('histMin').onclick = () => { setHistMin(!$('history').classList.contains('min')); queueSave(); };
   $('btnOpen').onclick = openFile;
