@@ -12,3 +12,6 @@ neutralino.js
 .storage
 *.log
 /download
+fixmeta*
+patch*.js
+ghrel.ps1
