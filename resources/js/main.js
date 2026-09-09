@@ -12,7 +12,7 @@ const STORE = 'hypad';
 const LEGACY = ['hybrid_scratchpad_v1'];
 const MAX_VERSIONS = 25;
 
-let st = { v: 2, tabs: [], active: null, sidebar: true, zoom: 100, onTop: true };
+let st = { v: 2, tabs: [], active: null, sidebar: true, zoom: 100, onTop: true, histMin: true };
 let saveTimer = null, verTimer = null, writing = false, pending = false;
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -366,6 +366,7 @@ function initWindow() {
         : await Neutralino.window.maximize();
     } catch (e) {}
     syncMaxIcon();
+  setHistMin(st.histMin !== false);
   };
   $('btnClose').onclick = async () => { await persist(); Neutralino.app.exit(); };
   $('btnPinTop').onclick = async e => {
@@ -501,6 +502,13 @@ function wire() {
     if (!h.hidden) renderHistory();
   };
   $('histClose').onclick = () => { $('history').hidden = true; $('btnHistory').classList.remove('on'); };
+  const setHistMin = (min) => {
+    st.histMin = min;
+    $('history').classList.toggle('min', min);
+    $('histMinUse').setAttribute('href', min ? '#i-restore' : '#i-min');
+    $('histMin').title = min ? 'Expand history' : 'Minimize history';
+  };
+  $('histMin').onclick = () => { setHistMin(!$('history').classList.contains('min')); queueSave(); };
   $('btnOpen').onclick = openFile;
   $('btnSave').onclick = () => saveFile(false);
 
