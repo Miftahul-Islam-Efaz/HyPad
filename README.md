@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb" />
-  <img alt="Size" src="https://img.shields.io/badge/download-~1.5%20MB-2ea44f" />
+  <img alt="Size" src="https://img.shields.io/badge/download-~1.3%20MB-2ea44f" />
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blueviolet" />
 </p>
 
