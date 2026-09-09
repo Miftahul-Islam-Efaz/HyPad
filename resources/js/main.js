@@ -352,7 +352,7 @@ function toast(m) {
 async function syncMaxIcon() {
   try {
     const m = await Neutralino.window.isMaximized();
-    $('maxUse').setAttribute('href', m ? '#i-restore' : '#i-max');
+    $('maxUse').setAttribute('href', m ? '#i-down' : '#i-max');
     document.body.classList.toggle('maximized', m);
   } catch (e) {}
 }
@@ -505,7 +505,7 @@ function wire() {
   const setHistMin = (min) => {
     st.histMin = min;
     $('history').classList.toggle('min', min);
-    $('histMinUse').setAttribute('href', min ? '#i-restore' : '#i-min');
+    $('histMinUse').setAttribute('href', min ? '#i-down' : '#i-up');
     $('histMin').title = min ? 'Expand history' : 'Minimize history';
   };
   $('histMin').onclick = () => { setHistMin(!$('history').classList.contains('min')); queueSave(); };
