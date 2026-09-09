@@ -37,7 +37,7 @@ It uses the system WebView instead of bundling a browser runtime, so the whole a
 
 ## Install
 
-1. Download **[HyPad-win_x64.zip](download/HyPad-win_x64.zip?raw=1)** (1.3 MB) from the `download` folder, or from [Releases](../../releases).
+1. Download **[HyPad-win_x64.zip](https://github.com/Miftahul-Islam-Efaz/HyPad/raw/main/download/HyPad-win_x64.zip)** (1.3 MB) from the `download` folder, or from [Releases](../../releases).
 2. Extract the folder anywhere.
 3. Run `HyPad-win_x64.exe`, keeping `resources.neu` in the same folder.
 
