@@ -352,7 +352,7 @@ function toast(m) {
 async function syncMaxIcon() {
   try {
     const m = await Neutralino.window.isMaximized();
-    $('maxUse').setAttribute('href', m ? '#i-down' : '#i-max');
+    $('maxUse').setAttribute('href', m ? '#i-restore' : '#i-max');
     document.body.classList.toggle('maximized', m);
   } catch (e) {}
 }
