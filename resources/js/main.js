@@ -6,6 +6,116 @@ Neutralino.init();
 const $ = id => document.getElementById(id);
 const ed = $('editor');
 
+/* ------------------------------------------------------------------
+   Rich editor core.
+   The editor is a contenteditable surface, so bold/headings/lists are
+   really rendered instead of showing their Markdown syntax. Everything
+   still round-trips to Markdown for storage, search, history and files,
+   via the .value shim below.
+   ------------------------------------------------------------------ */
+const plainText = () => ed.innerText.replace(/\r/g, '');
+
+// Markdown <- DOM
+function htmlToMd(root) {
+  const out = [];
+  const inlineMd = node => {
+    let s = '';
+    node.childNodes.forEach(n => {
+      if (n.nodeType === 3) { s += n.nodeValue; return; }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toLowerCase();
+      if (tag === 'br') { s += '\n'; return; }
+      const inner = inlineMd(n);
+      if (tag === 'b' || tag === 'strong') s += inner.trim() ? '**' + inner + '**' : inner;
+      else if (tag === 'i' || tag === 'em') s += inner.trim() ? '*' + inner + '*' : inner;
+      else if (tag === 's' || tag === 'strike' || tag === 'del') s += '~~' + inner + '~~';
+      else if (tag === 'code') s += '`' + inner + '`';
+      else if (tag === 'a') s += '[' + inner + '](' + (n.getAttribute('href') || '') + ')';
+      else s += inner;
+    });
+    return s;
+  };
+  const block = (el, depth) => {
+    const tag = el.tagName ? el.tagName.toLowerCase() : '';
+    if (el.classList && el.classList.contains('lcard')) { out.push(el.dataset.url || ''); return; }
+    if (/^h[1-6]$/.test(tag)) { out.push('#'.repeat(+tag[1]) + ' ' + inlineMd(el)); return; }
+    if (tag === 'blockquote') { el.childNodes.forEach(c => c.nodeType === 1 ? block(c, depth) : out.push('> ' + c.nodeValue)); return; }
+    if (tag === 'ul' || tag === 'ol') {
+      let i = 1;
+      el.querySelectorAll(':scope > li').forEach(li => {
+        const pad = '  '.repeat(depth);
+        out.push(pad + (tag === 'ol' ? (i++) + '. ' : '- ') + inlineMd(li).split('\n')[0]);
+        li.querySelectorAll(':scope > ul, :scope > ol').forEach(sub => block(sub, depth + 1));
+      });
+      return;
+    }
+    if (tag === 'hr') { out.push('---'); return; }
+    if (tag === 'pre') { out.push('```', el.innerText, '```'); return; }
+    const line = inlineMd(el);
+    out.push(line);
+  };
+  root.childNodes.forEach(n => {
+    if (n.nodeType === 3) { if (n.nodeValue.trim()) out.push(n.nodeValue); return; }
+    if (n.nodeType === 1) block(n, 0);
+  });
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// DOM <- Markdown (mdToHtml is defined further down and is hoisted)
+function setDocFromMd(md) {
+  ed.innerHTML = md && md.trim() ? mdToHtml(md) : '<div><br></div>';
+  hydrateCards();
+}
+
+/* .value / selection shim: existing code keeps talking Markdown + offsets */
+Object.defineProperty(ed, 'value', {
+  get() { return htmlToMd(ed); },
+  set(v) { setDocFromMd(v); },
+  configurable: true
+});
+function caretOffset(which) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !ed.contains(sel.anchorNode)) return 0;
+  const r = sel.getRangeAt(0).cloneRange();
+  r.selectNodeContents(ed);
+  const end = which === 'end' ? sel.getRangeAt(0).endContainer : sel.getRangeAt(0).startContainer;
+  const off = which === 'end' ? sel.getRangeAt(0).endOffset : sel.getRangeAt(0).startOffset;
+  try { r.setEnd(end, off); } catch (e) { return 0; }
+  return r.toString().length;
+}
+Object.defineProperty(ed, 'selectionStart', { get: () => caretOffset('start'), configurable: true });
+Object.defineProperty(ed, 'selectionEnd', { get: () => caretOffset('end'), configurable: true });
+ed.setSelectionRange = (a, b) => {
+  const walk = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+  let seen = 0, s = null, e = null, n;
+  while ((n = walk.nextNode())) {
+    const len = n.nodeValue.length;
+    if (!s && seen + len >= a) s = [n, a - seen];
+    if (!e && seen + len >= (b === undefined ? a : b)) { e = [n, (b === undefined ? a : b) - seen]; break; }
+    seen += len;
+  }
+  if (!s) return;
+  const r = document.createRange();
+  r.setStart(s[0], Math.min(s[1], s[0].nodeValue.length));
+  if (e) r.setEnd(e[0], Math.min(e[1], e[0].nodeValue.length)); else r.collapse(true);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+};
+
+/* link cards: clickable, not editable, deletable as a single unit */
+function hydrateCards() {
+  ed.querySelectorAll('.lcard').forEach(c => {
+    c.setAttribute('contenteditable', 'false');
+    if (!c.dataset.url) c.dataset.url = c.getAttribute('href') || '';
+  });
+}
+function insertCardFor(url) {
+  const cardHtml = linkCard(esc(url));
+  if (!cardHtml) return false;
+  document.execCommand('insertHTML', false, cardHtml + '<div><br></div>');
+  hydrateCards();
+  return true;
+}
+
 /* Single preferences record. Every save overwrites this one key, so nothing
    accumulates in storage. Legacy keys are cleared once on boot. */
 const STORE = 'hypad';
@@ -146,7 +256,7 @@ function renderHistory() {
     el.querySelector('.hw').textContent = new Date(v.at).toLocaleString();
     el.title = 'Restore this version';
     el.onclick = () => {
-      snapshot(); t.text = v.text; typeIn(v.text, 0, ed.value.length);
+      snapshot(); t.text = v.text; setDocFromMd(v.text); t.html = ed.innerHTML;
       markDirty(); updateStatus(); renderHistory(); toast('Version restored');
     };
     box.appendChild(el);
@@ -154,7 +264,7 @@ function renderHistory() {
 }
 
 function updateStatus() {
-  const v = ed.value;
+  const v = plainText();
   $('stCount').textContent = `${v.trim() ? v.trim().split(/\s+/).length : 0} words \u00b7 ${v.length} characters`;
   const upto = v.slice(0, ed.selectionStart).split('\n');
   $('stPos').textContent = `Ln ${upto.length}, Col ${upto[upto.length - 1].length + 1}`;
@@ -171,6 +281,7 @@ const titleFrom = text => {
 function markDirty() {
   const t = active(); if (!t) return;
   t.text = ed.value;
+  t.html = ed.innerHTML;
   t.dirty = true;
   t.updated = nowISO();
   if (!t.path && !t.named) t.title = titleFrom(t.text);   // manual names win
@@ -183,7 +294,7 @@ function switchTab(id) {
   const cur = active(); if (cur) cur.sel = ed.selectionStart;
   st.active = id;
   const t = active(); if (!t) return;
-  ed.value = t.text;
+  if (t.html) { ed.innerHTML = t.html; hydrateCards(); } else setDocFromMd(t.text);
   ed.focus();
   ed.setSelectionRange(t.sel || 0, t.sel || 0);
   renderTabs(); renderNotes(); updateStatus(); queueSave();
@@ -199,53 +310,101 @@ function closeTab(id) {
   else { renderTabs(); renderNotes(); queueSave(); }
 }
 
-/* ---------- markdown ---------- */
-// undo-safe replacement: routes through execCommand so Ctrl+Z / Ctrl+Y work
+/* ---------- formatting commands (native, so undo/redo just works) ---------- */
 function typeIn(text, from, to) {
   ed.focus();
   if (from !== undefined) ed.setSelectionRange(from, to === undefined ? from : to);
-  let ok = false;
-  try { ok = document.execCommand('insertText', false, text); } catch (err) { ok = false; }
-  if (!ok) {
-    const s = ed.selectionStart, e = ed.selectionEnd, v = ed.value;
-    ed.value = v.slice(0, s) + text + v.slice(e);
-    ed.setSelectionRange(s + text.length, s + text.length);
-    ed.dispatchEvent(new Event('input', { bubbles: true }));
-  }
+  try { document.execCommand('insertText', false, text); } catch (e) {}
 }
-function wrapSel(pre, post) {
-  const s = ed.selectionStart, e = ed.selectionEnd, v = ed.value;
-  const inner = v.slice(s, e);
-  // toggle off when the selection is already wrapped
-  if (post && inner.startsWith(pre) && inner.endsWith(post) && inner.length >= pre.length + post.length) {
-    const stripped = inner.slice(pre.length, inner.length - post.length);
-    typeIn(stripped, s, e);
-    ed.setSelectionRange(s, s + stripped.length);
-  } else {
-    typeIn(pre + inner + post, s, e);
-    ed.setSelectionRange(s + pre.length, s + pre.length + inner.length);
-  }
+const cmd = (name, val) => { ed.focus(); document.execCommand(name, false, val); markDirty(); updateStatus(); };
+function toggleBlock(tag) {
+  ed.focus();
+  const sel = window.getSelection();
+  let node = sel.anchorNode;
+  while (node && node !== ed && (!node.tagName || !/^(H[1-6]|P|DIV|BLOCKQUOTE|LI)$/.test(node.tagName))) node = node.parentNode;
+  const cur = node && node.tagName ? node.tagName.toLowerCase() : '';
+  document.execCommand('formatBlock', false, cur === tag ? 'div' : tag);
   markDirty(); updateStatus();
 }
-function linePrefix(prefix, numbered) {
-  const v = ed.value, s = ed.selectionStart, e = ed.selectionEnd;
-  const a = v.lastIndexOf('\n', s - 1) + 1;
-  let b = v.indexOf('\n', e); if (b < 0) b = v.length;
-  const rx = /^(\s*)(?:[-*]\s\[[ x]\]\s|[-*]\s|\d+\.\s|>\s|#{1,6}\s)?/;
-  const out = v.slice(a, b).split('\n').map((ln, i) => ln.replace(rx, (m, w) => w + (numbered ? (i + 1) + '. ' : prefix)));
-  const joined = out.join('\n');
-  typeIn(joined, a, b);
-  ed.setSelectionRange(a, a + joined.length);
+function wrapSel(pre, post) {   // kept for Tab and programmatic edits
+  typeIn(pre + (post ? '' : ''), ed.selectionStart, ed.selectionEnd);
+  markDirty(); updateStatus();
+}
+function inlineCode() {
+  const sel = window.getSelection();
+  const text = sel ? sel.toString() : '';
+  ed.focus();
+  document.execCommand('insertHTML', false, '<code>' + (esc(text) || '&nbsp;') + '</code>&nbsp;');
   markDirty(); updateStatus();
 }
 const MD = {
-  h1: () => linePrefix('# '), h2: () => linePrefix('## '), h3: () => linePrefix('### '),
-  bold: () => wrapSel('**', '**'), italic: () => wrapSel('*', '*'),
-  strike: () => wrapSel('~~', '~~'), code: () => wrapSel('`', '`'),
-  ul: () => linePrefix('- '), ol: () => linePrefix('', true),
-  task: () => linePrefix('- [ ] '), quote: () => linePrefix('> '),
-  hr: () => wrapSel('\n\n---\n\n', '')
+  h1: () => toggleBlock('h1'), h2: () => toggleBlock('h2'), h3: () => toggleBlock('h3'),
+  bold: () => cmd('bold'), italic: () => cmd('italic'), strike: () => cmd('strikeThrough'),
+  code: inlineCode,
+  ul: () => cmd('insertUnorderedList'), ol: () => cmd('insertOrderedList'),
+  task: () => { ed.focus(); document.execCommand('insertHTML', false, '<div>\u2610 </div>'); markDirty(); },
+  quote: () => toggleBlock('blockquote'),
+  hr: () => { ed.focus(); document.execCommand('insertHTML', false, '<hr /><div><br></div>'); markDirty(); }
 };
+
+/* ---------- Markdown typed inline turns into real formatting ---------- */
+function autoFormat() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const node = sel.anchorNode;
+  if (!node || node.nodeType !== 3) return;
+  const txt = node.nodeValue, off = sel.anchorOffset;
+  const before = txt.slice(0, off);
+
+  // block level: "# ", "## ", "### ", "> ", "- ", "1. " at the start of a line
+  const bm = before.match(/^(#{1,3}|>|-|\*|\d+\.)\u0020$/);
+  if (bm) {
+    const tag = bm[1][0] === '#' ? 'h' + bm[1].length : bm[1] === '>' ? 'blockquote' : null;
+    node.nodeValue = txt.slice(off);
+    ed.setSelectionRange(caretOffset('start'));
+    if (tag) document.execCommand('formatBlock', false, tag);
+    else if (bm[1] === '-' || bm[1] === '*') document.execCommand('insertUnorderedList');
+    else document.execCommand('insertOrderedList');
+    return;
+  }
+  // inline level: **bold**, *italic*, ~~strike~~, `code`
+  const pairs = [[/\*\*([^*]+)\*\*$/, 'bold'], [/(?:^|[^*])\*([^*]+)\*$/, 'italic'],
+                 [/~~([^~]+)~~$/, 'strikeThrough'], [/`([^`]+)`$/, 'code']];
+  for (const [rx, action] of pairs) {
+    const m = before.match(rx);
+    if (!m) continue;
+    const inner = m[1];
+    const full = m[0].startsWith('*') || m[0].startsWith('~') || m[0].startsWith('`') ? m[0] : m[0].slice(1);
+    const start = off - full.length;
+    const r = document.createRange();
+    r.setStart(node, start); r.setEnd(node, off);
+    const s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(r);
+    if (action === 'code') document.execCommand('insertHTML', false, '<code>' + esc(inner) + '</code>');
+    else { document.execCommand('insertText', false, inner);
+      const e2 = caretOffset('start'); ed.setSelectionRange(e2 - inner.length, e2);
+      document.execCommand(action);
+      ed.setSelectionRange(e2, e2);
+      document.execCommand(action, false, null);
+    }
+    return;
+  }
+  // a finished URL becomes a link (plus a card for videos)
+  const um = before.match(/(^|\s)(https?:\/\/[^\s]+)$/);
+  if (um) {
+    const url = um[2];
+    const start = off - url.length;
+    const r = document.createRange();
+    r.setStart(node, start); r.setEnd(node, off);
+    const s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(r);
+    document.execCommand('insertHTML', false,
+      '<a href="' + esc(url) + '">' + esc(url) + '</a>&nbsp;');
+    const card = linkCard(esc(url));
+    if (card && /youtu\.be|youtube\.com|vimeo\.com/.test(url)) {
+      document.execCommand('insertHTML', false, '<div><br></div>' + card + '<div><br></div>');
+      hydrateCards();
+    }
+  }
+}
 
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function inline(s) {
@@ -304,47 +463,38 @@ function doPreview(keep) {
   const show = keep ? true : p.hidden;
   p.hidden = !show;
   $('btnPreview').classList.toggle('on', show);
-  if (show) p.innerHTML = mdToHtml(ed.value);
+  if (show) { p.textContent = ed.value; p.className = 'srcView'; }
 }
 
 /* ---------- find & replace ---------- */
 const msg = m => { $('findMsg').textContent = m; };
 function findNext(dir) {
   const q = $('findInput').value; if (!q) return;
-  const cs = $('findCase').checked, wrap = $('findWrap').checked;
-  const hay = cs ? ed.value : ed.value.toLowerCase();
-  const needle = cs ? q : q.toLowerCase();
-  let i;
-  if (dir > 0) {
-    i = hay.indexOf(needle, ed.selectionEnd);
-    if (i < 0) { if (!wrap) return msg('End of document reached'); i = hay.indexOf(needle); }
-  } else {
-    i = hay.lastIndexOf(needle, Math.max(0, ed.selectionStart - 1));
-    if (i < 0) { if (!wrap) return msg('Beginning of document reached'); i = hay.lastIndexOf(needle); }
-  }
-  if (i < 0) return msg('No results');
-  ed.focus(); ed.setSelectionRange(i, i + q.length);
-  const total = hay.split(needle).length - 1;
-  msg(`${total} result${total === 1 ? '' : 's'}`);
+  ed.focus();
+  const found = window.find(q, $('findCase').checked, dir < 0, $('findWrap').checked, false, false, false);
+  if (!found) return msg('No results');
+  const hay = $('findCase').checked ? plainText() : plainText().toLowerCase();
+  const total = hay.split($('findCase').checked ? q : q.toLowerCase()).length - 1;
+  msg(total + ' result' + (total === 1 ? '' : 's'));
   updateStatus();
 }
 function replaceOne() {
   const q = $('findInput').value; if (!q) return;
-  const sel = ed.value.slice(ed.selectionStart, ed.selectionEnd);
+  const sel = window.getSelection().toString();
   const hit = $('findCase').checked ? sel === q : sel.toLowerCase() === q.toLowerCase();
-  if (hit) {
-    const s = ed.selectionStart, e2 = ed.selectionEnd, r = $('replInput').value;
-    typeIn(r, s, e2);
-    markDirty();
-  }
+  if (hit) { document.execCommand('insertText', false, $('replInput').value); markDirty(); }
   findNext(1);
 }
 function replaceAll() {
   const q = $('findInput').value; if (!q) return;
-  const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $('findCase').checked ? 'g' : 'gi');
-  const n = (ed.value.match(rx) || []).length;
-  if (n) typeIn(ed.value.replace(rx, $('replInput').value), 0, ed.value.length);
-  markDirty(); updateStatus(); msg(`Replaced ${n}`);
+  ed.focus();
+  const sel = window.getSelection(); sel.removeAllRanges();
+  let n = 0;
+  while (window.find(q, $('findCase').checked, false, false, false, false, false) && n < 5000) {
+    document.execCommand('insertText', false, $('replInput').value);
+    n++;
+  }
+  markDirty(); updateStatus(); msg('Replaced ' + n);
 }
 function toggleFind(force) {
   const b = $('findbar');
@@ -542,29 +692,43 @@ function setZoom(z) {
 
 /* ---------- wiring ---------- */
 function wire() {
-  ed.addEventListener('input', () => { markDirty(); updateStatus(); if (!$('preview').hidden) doPreview(true); });
+  ed.addEventListener('input', () => {
+    autoFormat();
+    markDirty(); updateStatus();
+    if (!$('preview').hidden) doPreview(true);
+  });
   ed.addEventListener('keyup', updateStatus);
   ed.addEventListener('click', updateStatus);
   ed.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      const s = ed.selectionStart, v = ed.value;
-      const line = v.slice(v.lastIndexOf('\n', s - 1) + 1, s);
-      const m = line.match(/^(\s*)([-*]\s\[[ x]\]\s|[-*]\s|(\d+)\.\s)/);
-      if (m) {
-        e.preventDefault();
-        if (line.trim() === m[0].trim()) {
-          const a = v.lastIndexOf('\n', s - 1) + 1;
-          typeIn('', a, s);
-        } else {
-          const next = m[3] ? m[1] + (parseInt(m[3], 10) + 1) + '. ' : m[1] + m[2].replace(/\[x\]/i, '[ ]');
-          typeIn('\n' + next, s, s);
-        }
-        markDirty(); updateStatus();
-      }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.execCommand(e.shiftKey ? 'outdent' : 'indent');
     }
-    if (e.key === 'Tab') { e.preventDefault(); wrapSel('\t', ''); }
   });
-
+  // paste as clean text; a pasted URL becomes a link (and a card for videos)
+  ed.addEventListener('paste', e => {
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    if (!text) return;
+    e.preventDefault();
+    const url = text.trim();
+    if (/^https?:\/\/\S+$/.test(url)) {
+      document.execCommand('insertHTML', false, '<a href="' + esc(url) + '">' + esc(url) + '</a>');
+      if (/youtu\.be|youtube\.com|vimeo\.com/.test(url)) insertCardFor(url);
+      else { const c = linkCard(esc(url)); if (c) { document.execCommand('insertHTML', false, '<div><br></div>' + c + '<div><br></div>'); hydrateCards(); } }
+    } else {
+      document.execCommand('insertText', false, text);
+    }
+    markDirty(); updateStatus();
+  });
+  // Ctrl+click or click on a card opens the link in the browser
+  ed.addEventListener('click', async e => {
+    const card = e.target.closest('.lcard');
+    const a = e.target.closest('a[href^="http"]');
+    const url = card ? card.dataset.url : (a && (e.ctrlKey || e.metaKey) ? a.getAttribute('href') : null);
+    if (!url) return;
+    e.preventDefault();
+    try { await Neutralino.os.open(url); } catch (err) { toast('Could not open link'); }
+  });
   document.querySelectorAll('#toolbar [data-md]').forEach(b => {
     b.addEventListener('mousedown', e => e.preventDefault()); // keep textarea selection
     b.onclick = () => MD[b.dataset.md]();

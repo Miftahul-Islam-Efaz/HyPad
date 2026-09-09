@@ -95,7 +95,7 @@
         <button data-md="hr" title="Divider">&mdash;</button>
         <span class="grow"></span>
         <button id="btnFind" class="tb" title="Find and replace (Ctrl+F)"><svg class="gl"><use href="#i-search"/></svg><span>Find</span></button>
-        <button id="btnPreview" class="tb" title="Markdown preview (Ctrl+P)"><svg class="gl"><use href="#i-eye"/></svg><span>Preview</span></button>
+        <button id="btnPreview" class="tb" title="Show Markdown source (Ctrl+P)"><svg class="gl"><use href="#i-eye"/></svg><span>Source</span></button>
         <button id="btnHistory" class="tb" title="Version history (Ctrl+H)"><svg class="gl"><use href="#i-history"/></svg><span>History</span></button>
         <span class="sep"></span>
         <button id="btnOpen" class="tb" title="Open file (Ctrl+O)"><svg class="gl"><use href="#i-open"/></svg><span>Open</span></button>
@@ -118,7 +118,8 @@
 
       <!-- ================= editor ================= -->
       <div id="editorWrap">
-        <textarea id="editor" spellcheck="true" placeholder="Start typing. Markdown is supported."></textarea>
+        <div id="editor" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true"
+             data-ph="Start typing. Markdown formats itself as you type."></div>
         <div id="preview" hidden></div>
         <aside id="history" class="min" hidden>
           <div id="historyHead">
