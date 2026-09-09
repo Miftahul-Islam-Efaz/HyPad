@@ -82,3 +82,12 @@ button:active .gl { transform: scale(.9); }
 .hrow:hover { background: var(--bg3); }
 .hrow small { color: var(--fg2); }
 .chk { display: inline-flex; align-items: center; gap: 5px; font: 12px/1 var(--font-ui); color: var(--fg2); }
+
+/* ---------- version history: collapsible ---------- */
+#history { display: flex; flex-direction: column; transition: height .26s var(--ease-out, ease); }
+#historyHead { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 6px 5px 12px; min-height: 38px; border-bottom: 1px solid var(--line); font: 600 12.5px/1 var(--font-ui); color: var(--fg); flex: none; }
+#historyHead > span { flex: 1; }
+#histList { overflow-y: auto; flex: 1; padding: 6px; }
+#history.min { height: 38px; min-height: 38px; overflow: hidden; }
+#history.min #historyHead { border-bottom: 0; }
+#history.min #histList { display: none; }
