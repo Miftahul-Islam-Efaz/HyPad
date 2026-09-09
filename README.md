@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb" />
-  <img alt="Size" src="https://img.shields.io/badge/download-~1.3%20MB-2ea44f" />
+  <img alt="Size" src="https://img.shields.io/badge/installer-1.2%20MB-2ea44f" />
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blueviolet" />
 </p>
 
@@ -38,47 +38,36 @@ It uses the system WebView instead of bundling a browser runtime, so the whole a
 
 ## Install
 
-1. Download **[HyPad-win_x64.zip](https://github.com/Miftahul-Islam-Efaz/HyPad/releases/latest/download/HyPad-win_x64.zip)** (1.3 MB) from the [latest release](../../releases/latest).
-2. Extract the folder anywhere.
-3. Right-click **`Install-HyPad.ps1`** and choose **Run with PowerShell**.
+1. Download **[HyPad-Setup.exe](https://github.com/Miftahul-Islam-Efaz/HyPad/releases/latest/download/HyPad-Setup.exe)** (1.2 MB) from the [latest release](../../releases/latest).
+2. Double-click it and confirm the prompt.
 
-That script is what registers HyPad with Windows. It copies the app to
-`%LOCALAPPDATA%\Programs\HyPad`, adds a **Start menu shortcut** so HyPad shows up in
-the Windows app list and search, lists it under **Settings → Apps → Installed apps**
-with a working uninstaller, and adds HyPad to the **Open with** menu for text files.
-No admin rights are needed.
+That is the whole installation. Setup registers HyPad the way any Windows app
+does: it installs to `%LOCALAPPDATA%\Programs\HyPad`, adds a **Start menu
+shortcut** so HyPad appears in the Windows app list and in search, lists itself
+under **Settings → Apps → Installed apps** with a working uninstaller, and adds
+HyPad to the **Open with** menu for text files. No admin rights are required.
 
-### What each file in the zip does
+### Uninstall
 
-| File | Purpose |
-| --- | --- |
-| `Install-HyPad.ps1` | **Run this to install.** Registers HyPad in the Windows app list, Start menu, and Installed apps. |
-| `HyPad-win_x64.exe` | The app itself. Runs portably without installing, but will *not* appear in the Windows app list. |
-| `resources.neu` | App resources. Must stay in the same folder as the `.exe`. |
-| `Uninstall-HyPad.ps1` | Removes HyPad, its shortcut, and its registry entries. Your notes are kept. |
+**Settings → Apps → Installed apps → HyPad → Uninstall**, like any other app.
+Your notes are kept.
 
-### Portable use
+### Portable version
 
-Prefer not to install? Just run `HyPad-win_x64.exe` directly, keeping `resources.neu`
-beside it. Nothing is written to the registry, but HyPad will not appear in the
-Windows app list.
+Prefer not to install anything? Download
+**[HyPad-win_x64.zip](https://github.com/Miftahul-Islam-Efaz/HyPad/releases/latest/download/HyPad-win_x64.zip)**,
+extract it, and run `HyPad-win_x64.exe` with `resources.neu` beside it. Nothing
+is written to the registry, but HyPad will not appear in the Windows app list.
 
-### Updating an existing install
+### A note on the SmartScreen warning
 
-Run `Uninstall-HyPad.ps1` from your old copy first (or use **Settings → Apps →
-Installed apps → HyPad → Uninstall**), then run `Install-HyPad.ps1` from the new zip.
-Your notes live outside the app folder, so they survive reinstalling.
-
-### Verify your download
-
-This build is not code signed, so SmartScreen may warn you the first time. Choose
-**More info → Run anyway**, or confirm the download is genuine first:
+This build is not code signed, so Windows may show "Windows protected your PC"
+the first time. Choose **More info → Run anyway**. You can verify the download is
+genuine by comparing its hash with the SHA-256 published in the release notes:
 
 ```powershell
-Get-FileHash HyPad-win_x64.zip -Algorithm SHA256
+Get-FileHash HyPad-Setup.exe -Algorithm SHA256
 ```
-
-It should match the SHA-256 published in the [latest release](../../releases/latest) notes.
 
 > Requires the Microsoft WebView2 Runtime, which is preinstalled on Windows 11 and most Windows 10 systems.
 
