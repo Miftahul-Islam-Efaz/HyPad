@@ -333,9 +333,8 @@ function replaceOne() {
   const sel = ed.value.slice(ed.selectionStart, ed.selectionEnd);
   const hit = $('findCase').checked ? sel === q : sel.toLowerCase() === q.toLowerCase();
   if (hit) {
-    const s = ed.selectionStart, r = $('replInput').value;
-    ed.value = ed.value.slice(0, s) + r + ed.value.slice(ed.selectionEnd);
-    ed.setSelectionRange(s + r.length, s + r.length);
+    const s = ed.selectionStart, e2 = ed.selectionEnd, r = $('replInput').value;
+    typeIn(r, s, e2);
     markDirty();
   }
   findNext(1);
@@ -344,7 +343,7 @@ function replaceAll() {
   const q = $('findInput').value; if (!q) return;
   const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $('findCase').checked ? 'g' : 'gi');
   const n = (ed.value.match(rx) || []).length;
-  ed.value = ed.value.replace(rx, $('replInput').value);
+  if (n) typeIn(ed.value.replace(rx, $('replInput').value), 0, ed.value.length);
   markDirty(); updateStatus(); msg(`Replaced ${n}`);
 }
 function toggleFind(force) {
@@ -363,8 +362,12 @@ async function openFile() {
   try {
     const paths = await Neutralino.os.showOpenDialog('Open a text file', {
       multiSelections: true,
-      filters: [{ name: 'Text and Markdown', extensions: ['txt', 'md', 'markdown', 'log', 'json', 'csv'] },
-                { name: 'All files', extensions: ['*'] }]
+      filters: [
+        { name: 'Text and Markdown', extensions: ['txt', 'md', 'markdown', 'log', 'json', 'csv', 'ini', 'cfg', 'conf', 'html', 'htm'] },
+        { name: 'Text document', extensions: ['txt'] },
+        { name: 'Markdown', extensions: ['md', 'markdown'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
     });
     if (!paths || !paths.length) return;
     for (const p of paths) {
@@ -375,18 +378,55 @@ async function openFile() {
     toast('Opened');
   } catch (e) { toast('Could not open file'); }
 }
+// text -> bytes for the chosen container format
+function htmlDoc(title, body) {
+  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8" />\n' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1" />\n<title>' + esc(title) + '</title>\n' +
+    '<style>body{max-width:44rem;margin:3rem auto;padding:0 1.25rem;' +
+    'font:16px/1.7 -apple-system,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;color:#24292f}' +
+    'pre,code{font-family:"Cascadia Code",Consolas,monospace;background:#f4f4f6;border-radius:4px}' +
+    'pre{padding:.8rem;overflow:auto}code{padding:.1rem .3rem}' +
+    'blockquote{margin:0;padding-left:1rem;border-left:3px solid #d0d7de;color:#57606a}' +
+    'a{color:#0969da}hr{border:0;border-top:1px solid #d0d7de}img{max-width:100%}</style>\n' +
+    '</head>\n<body>\n' + body + '\n</body>\n</html>\n';
+}
+function csvDoc(text) {
+  return 'line,content\n' + text.split(/\r?\n/).map((l, i) =>
+    (i + 1) + ',"' + l.replace(/"/g, '""') + '"').join('\n') + '\n';
+}
+function encodeFor(path, t, text) {
+  const ext = (path.match(/\.([A-Za-z0-9]+)$/) || [, ''])[1].toLowerCase();
+  if (ext === 'html' || ext === 'htm') return htmlDoc(t.title || 'Note', mdToHtml(text));
+  if (ext === 'csv') return csvDoc(text);
+  if (ext === 'json') return JSON.stringify({
+    title: t.title || 'Note', savedAt: new Date().toISOString(),
+    characters: text.length, words: (text.trim().match(/\S+/g) || []).length,
+    text
+  }, null, 2) + '\n';
+  return text; // txt, md, markdown, log, ini, csv-less plain text, anything else
+}
 async function saveFile(saveAs) {
   const t = active(); if (!t) return;
   try {
     let p = t.path;
     if (!p || saveAs) {
       p = await Neutralino.os.showSaveDialog('Save note', {
-        defaultPath: (t.title || 'note').replace(/[\\/:*?"<>|]/g, '') + '.md',
-        filters: [{ name: 'Markdown', extensions: ['md'] }, { name: 'Text', extensions: ['txt'] }]
+        defaultPath: (t.title || 'note').replace(/\.[A-Za-z0-9]+$/, '').replace(/[\\/:*?"<>|]/g, '') + '.txt',
+        filters: [
+          { name: 'Text document', extensions: ['txt'] },
+          { name: 'Markdown', extensions: ['md', 'markdown'] },
+          { name: 'Web page', extensions: ['html', 'htm'] },
+          { name: 'Rich note data', extensions: ['json'] },
+          { name: 'Comma separated values', extensions: ['csv'] },
+          { name: 'Log file', extensions: ['log'] },
+          { name: 'Config file', extensions: ['ini', 'cfg', 'conf'] },
+          { name: 'All files', extensions: ['*'] }
+        ]
       });
       if (!p) return;
+      if (!/\.[A-Za-z0-9]+$/.test(p)) p += '.txt'; // default container is plain text
     }
-    await Neutralino.filesystem.writeFile(p, ed.value);
+    await Neutralino.filesystem.writeFile(p, encodeFor(p, t, ed.value));
     t.path = p; t.title = p.split(/[\\/]/).pop(); t.named = true; t.dirty = false;
     snapshot(); renderTabs(); renderNotes(); updateStatus(); persist();
     toast('Saved');
@@ -579,6 +619,7 @@ function wire() {
   $('histMin').onclick = () => { setHistMin(!$('history').classList.contains('min')); queueSave(); };
   $('btnOpen').onclick = openFile;
   $('btnSave').onclick = () => saveFile(false);
+  $('btnSave').addEventListener('contextmenu', e => { e.preventDefault(); saveFile(true); });
 
   document.addEventListener('keydown', e => {
     if (e.key === 'F2') {
