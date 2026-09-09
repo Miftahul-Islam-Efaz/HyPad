@@ -1,0 +1,109 @@
+/* ===== HyPad typography: crisp, readable, calm (loaded last) ===== */
+
+:root{
+  --font-ui:"Segoe UI Variable Display","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-read:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --fs:15px;
+  --lh:1.7;
+}
+
+body{
+  font-family:var(--font-ui);
+  font-size:13px;
+  letter-spacing:.005em;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* ---- the editor: the thing you actually stare at ---- */
+#editor{
+  font-family:var(--font-read);
+  font-size:var(--fs);
+  line-height:var(--lh);
+  letter-spacing:.01em;
+  padding:22px 26px;
+  max-width:none;
+  font-variant-ligatures:none;
+  caret-color:var(--acc);
+}
+#editor::placeholder{
+  font-family:var(--font-read);
+  font-style:normal;
+  letter-spacing:.01em;
+  opacity:.45;
+}
+:root[data-theme="dark"] #editor{color:#e7e7ee}
+:root[data-theme="light"] #editor{color:#26262c}
+
+/* comfortable reading measure for long notes */
+#preview{
+  font-family:var(--font-read);
+  font-size:var(--fs);
+  line-height:var(--lh);
+  padding:22px 26px;
+}
+#preview h1,#preview h2,#preview h3{
+  font-family:var(--font-ui);
+  font-weight:650;
+  letter-spacing:-.012em;
+  line-height:1.28;
+  margin:1.3em 0 .45em;
+}
+#preview h1{font-size:1.6em}
+#preview h2{font-size:1.32em}
+#preview h3{font-size:1.12em}
+#preview p,#preview ul,#preview ol,#preview blockquote{margin:0 0 .85em}
+#preview li{margin:.2em 0}
+#preview code,#preview pre{
+  font-family:"Cascadia Code","Cascadia Mono",Consolas,ui-monospace,monospace;
+  font-size:.9em;
+}
+#preview pre{padding:12px 14px;border-radius:12px;overflow-x:auto}
+#preview blockquote{
+  padding-left:14px;border-left:3px solid var(--acc);color:var(--fg2);
+}
+
+/* ---- chrome text: smaller, quieter, evenly weighted ---- */
+#appName{
+  font-family:var(--font-ui);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:-.005em;
+}
+.tab{font-size:12px;letter-spacing:.005em}
+.tab.active{font-weight:600}
+.note{font-size:12.5px;letter-spacing:.005em}
+#noteSearch{font-size:12.5px}
+#toolbar button{
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.01em;
+}
+#toolbar button[data-md="bold"]{font-weight:800}
+#toolbar button[data-md="italic"]{font-style:italic}
+#toolbar button[data-md="code"]{font-family:Consolas,ui-monospace,monospace}
+#status{
+  font-size:11.5px;
+  letter-spacing:.015em;
+  font-variant-numeric:tabular-nums;
+}
+#findbar{font-size:12px}
+#findbar input[type=text]{font-family:var(--font-ui);font-size:12.5px;padding:6px 10px}
+.hrow{font-size:12px;font-variant-numeric:tabular-nums}
+#historyHead{font-size:12.5px;font-weight:650}
+#toast{font-size:12.5px;font-weight:550}
+
+/* ---- app logo in the titlebar ---- */
+#appLogo{
+  width:20px;height:20px;
+  flex:none;
+  border-radius:5px;
+  object-fit:contain;
+  -webkit-user-select:none;
+  user-select:none;
+  pointer-events:none;
+}
+#drag{gap:9px;padding-left:2px}
+
+/* slightly airier titlebar so the logo has room */
+#titlebar{height:42px}

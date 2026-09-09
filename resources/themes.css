@@ -1,0 +1,229 @@
+/* ===== HyPad palettes + display fonts + motion (loaded last) =====
+   Palettes follow established low-fatigue schemes (Rose Pine, Everforest,
+   Nord, Catppuccin, Kanagawa). Rules used throughout:
+   - Never pure #000 or #fff; never fully saturated accents.
+   - Surfaces step in small, even lightness increments (base -> surface -> overlay).
+   - Body text lands ~7-11:1 on base; muted text ~4.5:1; accents are hue-shifted
+     neighbours of the background, not arbitrary hues, so nothing vibrates.
+   - One accent + one soft success/warn hue per theme. No competing primaries.
+*/
+
+/* ---------- display fonts ---------- */
+@font-face{
+  font-family:"Monilora";
+  src:url("fonts/Monilora-Demo.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"Tanker";
+  src:url("fonts/Tanker-Regular.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+
+:root{
+  --font-display:"Monilora","Tanker","Segoe UI Variable Display",system-ui,sans-serif;
+  --font-brand:"Tanker","Monilora","Segoe UI Variable Display",system-ui,sans-serif;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+}
+
+/* brand wordmark uses Tanker; display headings use Monilora */
+#appName{
+  font-family:var(--font-brand);
+  font-size:16px;
+  font-weight:400;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  line-height:1;
+  padding-top:1px;
+}
+#preview h1,#preview h2,#preview h3{
+  font-family:var(--font-display);
+  font-weight:400;
+  letter-spacing:.004em;
+}
+#preview h1{font-size:1.72em;line-height:1.2}
+#historyHead,#themeMenu .tmHead{font-family:var(--font-brand);letter-spacing:.05em;text-transform:uppercase;font-size:11.5px}
+
+/* =======================================================================
+   PALETTES
+   ======================================================================= */
+
+/* --- Midnight (Rose Pine Moon): muted plum base, warm rose accent --- */
+:root[data-theme="midnight"]{
+  --bg:#232136; --bg2:#2a273f; --bg3:#393552; --line:#44415a;
+  --fg:#e0def4; --fg2:#908caa;
+  --acc:#c4a7e7; --acc2:#9ccfd8; --danger:#eb6f92;
+  --shadow:0 24px 60px rgba(16,14,27,.55);
+  --sel:#403d52;
+}
+
+/* --- Forest (Everforest Dark Soft): earthy green, lowest contrast --- */
+:root[data-theme="forest"]{
+  --bg:#333c43; --bg2:#3a464c; --bg3:#434f55; --line:#4e5a5f;
+  --fg:#d3c6aa; --fg2:#9da9a0;
+  --acc:#a7c080; --acc2:#83c092; --danger:#e67e80;
+  --shadow:0 24px 60px rgba(20,26,28,.5);
+  --sel:#4d5c52;
+}
+
+/* --- Arctic (Nord): cool desaturated blue, built for long focus --- */
+:root[data-theme="arctic"]{
+  --bg:#2e3440; --bg2:#343c4a; --bg3:#3b4252; --line:#4c566a;
+  --fg:#e5e9f0; --fg2:#9aa5b8;
+  --acc:#88c0d0; --acc2:#a3be8c; --danger:#bf616a;
+  --shadow:0 24px 60px rgba(17,21,28,.55);
+  --sel:#434c5e;
+}
+
+/* --- Mocha (Catppuccin Mocha): mid-tone dark, balanced pastels --- */
+:root[data-theme="mocha"]{
+  --bg:#1e1e2e; --bg2:#242438; --bg3:#313244; --line:#45475a;
+  --fg:#cdd6f4; --fg2:#9399b2;
+  --acc:#b4befe; --acc2:#a6e3a1; --danger:#f38ba8;
+  --shadow:0 24px 60px rgba(12,12,20,.6);
+  --sel:#3a3c52;
+}
+
+/* --- Dragon (Kanagawa Dragon): warm ink grey, late-night lowest glare --- */
+:root[data-theme="dragon"]{
+  --bg:#181616; --bg2:#1f1c1c; --bg3:#282727; --line:#393836;
+  --fg:#c5c9c5; --fg2:#8f8e8b;
+  --acc:#c4b28a; --acc2:#8ba4b0; --danger:#c4746e;
+  --shadow:0 24px 60px rgba(0,0,0,.6);
+  --sel:#333230;
+}
+
+/* --- Paper (Everforest Light Soft): warm cream, no blue-white glare --- */
+:root[data-theme="paper"]{
+  --bg:#f3ead3; --bg2:#eee5c8; --bg3:#e5dcbe; --line:#ddd3b4;
+  --fg:#5c6a72; --fg2:#829181;
+  --acc:#8da101; --acc2:#35a77c; --danger:#f85552;
+  --shadow:0 20px 50px rgba(92,106,114,.16);
+  --sel:#e0dbb8;
+}
+
+/* --- Latte (Catppuccin Latte): clean light, soft lavender accent --- */
+:root[data-theme="latte"]{
+  --bg:#eff1f5; --bg2:#e6e9ef; --bg3:#dce0e8; --line:#ccd0da;
+  --fg:#4c4f69; --fg2:#7c7f93;
+  --acc:#7287fd; --acc2:#40a02b; --danger:#d20f39;
+  --shadow:0 20px 50px rgba(76,79,105,.15);
+  --sel:#d6dae4;
+}
+
+/* --- Dawn (Rose Pine Dawn): warm light, rose-tinted --- */
+:root[data-theme="dawn"]{
+  --bg:#faf4ed; --bg2:#f2e9e1; --bg3:#eae2da; --line:#dfd8d2;
+  --fg:#575279; --fg2:#797593;
+  --acc:#907aa9; --acc2:#56949f; --danger:#b4637a;
+  --shadow:0 20px 50px rgba(87,82,121,.14);
+  --sel:#e6dfd8;
+}
+
+/* =======================================================================
+   shared theme-aware surfaces
+   ======================================================================= */
+#shell{background:var(--bg);border-color:var(--line);box-shadow:var(--shadow)}
+#titlebar,#tabstrip,#sidebar{background:var(--bg2)}
+#toolbar,#findbar,#status{background:var(--bg2);border-color:var(--line)}
+#editor,#preview{background:var(--bg);color:var(--fg)}
+#editor::selection,#preview::selection{background:var(--sel)}
+#editor{caret-color:var(--acc)}
+#history{background:var(--bg2);border-left:1px solid var(--line)}
+#noteSearch,#findbar input[type=text]{background:var(--bg3);border-color:var(--line);color:var(--fg)}
+#noteSearch::placeholder,#findbar input::placeholder{color:var(--fg2)}
+.tab.active{background:var(--bg);border-color:var(--line);border-bottom-color:var(--bg)}
+#toolbar button.on,.ic.on{color:var(--acc)}
+#toolbar button.on{background:color-mix(in oklab,var(--acc) 18%,transparent)}
+#savedDot.saved{background:var(--acc2)}
+#toast{background:var(--fg);color:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--line);background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--fg2);background-clip:content-box}
+
+/* =======================================================================
+   MOTION - smooth, short, never in the way
+   ======================================================================= */
+:root{--t:.2s;--t-slow:.34s}
+
+#shell,#titlebar,#tabstrip,#sidebar,#toolbar,#status,#editor,#preview,
+.tab,.note,#toolbar button,.ic,#noteSearch,#findbar input,.hrow,#history{
+  transition:background-color var(--t) var(--ease),
+             color var(--t) var(--ease),
+             border-color var(--t) var(--ease),
+             box-shadow var(--t) var(--ease);
+}
+
+/* buttons: lift + settle */
+.ic,#toolbar button{transition:background-color var(--t) var(--ease),color var(--t) var(--ease),transform .14s var(--ease-out)}
+.ic:hover,#toolbar button:hover{transform:translateY(-1px)}
+.ic:active,#toolbar button:active{transform:translateY(0) scale(.94);transition-duration:.06s}
+
+/* tabs and notes slide in */
+@keyframes riseIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes panelIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes pulseDot{0%{transform:scale(.6);opacity:.4}60%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
+
+.tab{animation:riseIn .22s var(--ease-out) both}
+.note{animation:slideIn .22s var(--ease-out) both}
+.note:nth-child(2){animation-delay:.02s}
+.note:nth-child(3){animation-delay:.04s}
+.note:nth-child(4){animation-delay:.06s}
+.note:nth-child(n+5){animation-delay:.08s}
+#preview:not([hidden]){animation:fadeIn .24s var(--ease) both}
+#history:not([hidden]){animation:panelIn .26s var(--ease-out) both}
+#findbar:not([hidden]){animation:riseIn .2s var(--ease-out) both}
+#toast:not([hidden]){animation:toastIn .26s var(--ease-out) both}
+.hrow{animation:fadeIn .2s var(--ease) both}
+#savedDot.saved,#savedDot.dirty{animation:pulseDot .32s var(--ease-out)}
+
+/* focus rings, soft and on-theme */
+#noteSearch:focus,#findbar input:focus{
+  border-color:var(--acc);
+  box-shadow:0 0 0 3px color-mix(in oklab,var(--acc) 22%,transparent);
+  outline:0;
+}
+#editor:focus{outline:0}
+
+/* =======================================================================
+   theme picker menu (built by theme.js)
+   ======================================================================= */
+#themeMenu{
+  position:absolute;top:44px;right:10px;z-index:60;
+  width:194px;padding:8px;
+  background:var(--bg2);
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:var(--shadow);
+  animation:popIn .2s var(--ease-out) both;
+}
+#themeMenu[hidden]{display:none}
+#themeMenu .tmHead{color:var(--fg2);padding:4px 8px 7px}
+#themeMenu .tmItem{
+  display:flex;align-items:center;gap:9px;
+  width:100%;padding:7px 8px;margin:1px 0;
+  border:0;border-radius:11px;
+  background:transparent;color:var(--fg2);
+  font:inherit;font-size:12.5px;text-align:left;cursor:pointer;
+  transition:background-color .16s var(--ease),color .16s var(--ease);
+}
+#themeMenu .tmItem:hover{background:var(--bg3);color:var(--fg)}
+#themeMenu .tmItem.sel{color:var(--fg);font-weight:600}
+#themeMenu .sw{
+  width:22px;height:22px;flex:none;border-radius:7px;
+  border:1px solid rgba(128,128,128,.25);
+  position:relative;overflow:hidden;
+}
+#themeMenu .sw i{position:absolute;display:block}
+#themeMenu .sw i.a{inset:0}
+#themeMenu .sw i.b{right:0;top:0;bottom:0;width:38%}
+#themeMenu .sw i.c{left:4px;bottom:4px;width:7px;height:7px;border-radius:50%}
+#themeMenu .tmSep{height:1px;margin:6px 8px;background:var(--line)}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}

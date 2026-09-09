@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: ws: http://localhost:*" />
+<title>HyPad</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="theme.css" />
+<link rel="stylesheet" href="type.css" />
+<link rel="stylesheet" href="themes.css" />
+<link rel="stylesheet" href="ui.css" />
+</head>
+<body>
+
+<!-- icon sprite: custom-drawn, single stroke language -->
+<svg id="sprite" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <!-- panel / sidebar: a pad with its spine -->
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/><path d="M5.8 8.4h1.9M5.8 12h1.9"/></symbol>
+    <!-- plus: new pad -->
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 6.2v11.6M6.2 12h11.6"/></symbol>
+    <!-- pin: pushpin, angled -->
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M14.6 3.9l5.5 5.5-2.2 1 .5 4.4-8.7-8.7 4.4.5z"/><path d="M9.7 6.1l8.2 8.2"/><path d="M9.9 14.1L3.9 20.1"/></symbol>
+    <!-- moon / sun for theme -->
+    <symbol id="i-theme" viewBox="0 0 24 24"><path d="M20 13.4A8.2 8.2 0 1 1 10.6 4a6.4 6.4 0 0 0 9.4 9.4z"/><circle cx="15.4" cy="8.6" r=".9" fill="currentColor" stroke="none"/></symbol>
+    <!-- window controls, drawn thin -->
+    <symbol id="i-min" viewBox="0 0 24 24"><path d="M6.5 12h11"/></symbol>
+    <symbol id="i-max" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></symbol>
+    <symbol id="i-restore" viewBox="0 0 24 24"><rect x="5.5" y="8.5" width="10" height="10" rx="1.5"/><path d="M8.8 8.5V6.8a1.3 1.3 0 0 1 1.3-1.3h7.4a1.3 1.3 0 0 1 1.3 1.3v7.4a1.3 1.3 0 0 1-1.3 1.3h-1.7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></symbol>
+    <!-- editor actions -->
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="5.6"/><path d="M15.2 15.2l4 4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.9 12S6.3 6.4 12 6.4 21.1 12 21.1 12 17.7 17.6 12 17.6 2.9 12 2.9 12z"/><circle cx="12" cy="12" r="2.4"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.9 12a8.1 8.1 0 1 0 2.5-5.8"/><path d="M3.6 4.6v4h4"/><path d="M12 8.4V12l2.8 1.9"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3.6 8.2V6.4a1.4 1.4 0 0 1 1.4-1.4h3.7l1.8 2.1h6.1a1.4 1.4 0 0 1 1.4 1.4v1"/><path d="M3.6 9.6h16.8l-1.7 8.1a1.4 1.4 0 0 1-1.4 1.1H6.7a1.4 1.4 0 0 1-1.4-1.1z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 5.5h11.2L19 8.3V18a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M8.4 5.5v4.2h6.1V5.5"/><path d="M8.4 19v-4.4h7.2V19"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.8 7.4h14.4"/><path d="M9.6 7.4V5.6a1 1 0 0 1 1-1h2.8a1 1 0 0 1 1 1v1.8"/><path d="M6.6 7.4l.9 11a1 1 0 0 0 1 .9h7a1 1 0 0 0 1-.9l.9-11"/><path d="M10.6 10.8v5M13.4 10.8v5"/></symbol>
+    <symbol id="i-rename" viewBox="0 0 24 24"><path d="M4.6 19.4h4.2L19.3 8.9a2 2 0 0 0 0-2.8l-1.4-1.4a2 2 0 0 0-2.8 0L4.6 15.2z"/><path d="M14.4 5.8l3.8 3.8"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 18.4V5.9M6.6 11.3L12 5.9l5.4 5.4"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5.6v12.5M17.4 12.7L12 18.1l-5.4-5.4"/></symbol>
+  </defs>
+</svg>
+
+<div id="shell">
+
+  <!-- ================= titlebar ================= -->
+  <div id="titlebar">
+    <div id="drag">
+      <button id="btnSidebar" class="ic" title="Toggle notes sidebar (Ctrl+B)"><svg class="gl"><use href="#i-panel"/></svg></button>
+      <img id="appLogo" src="icons/appIcon.png" alt="" />
+      <span id="appName">HyPad</span>
+      <span id="savedDot" title="Saved"></span>
+    </div>
+    <div id="winctl">
+      <button id="btnTheme" class="ic" title="Theme"><svg class="gl"><use href="#i-theme"/></svg></button>
+      <button id="btnPinTop" class="ic on" title="Always on top"><svg class="gl"><use href="#i-pin"/></svg></button>
+      <button id="btnMin" class="ic" title="Minimize"><svg class="gl"><use href="#i-min"/></svg></button>
+      <button id="btnMax" class="ic" title="Maximize"><svg class="gl"><use id="maxUse" href="#i-max"/></svg></button>
+      <button id="btnClose" class="ic danger" title="Close"><svg class="gl"><use href="#i-close"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ================= tabs ================= -->
+  <div id="tabstrip">
+    <div id="tabs"></div>
+    <button id="btnNewTab" class="ic" title="New note (Ctrl+N)"><svg class="gl"><use href="#i-plus"/></svg></button>
+  </div>
+
+  <div id="body">
+    <!-- ================= sidebar ================= -->
+    <aside id="sidebar">
+      <div id="searchWrap">
+        <svg class="gl sIcon"><use href="#i-search"/></svg>
+        <input id="noteSearch" type="text" placeholder="Search notes" spellcheck="false" />
+      </div>
+      <div id="noteList"></div>
+    </aside>
+
+    <main id="main">
+      <!-- ================= toolbar ================= -->
+      <div id="toolbar">
+        <button data-md="h1" title="Heading 1">H1</button>
+        <button data-md="h2" title="Heading 2">H2</button>
+        <button data-md="h3" title="Heading 3">H3</button>
+        <span class="sep"></span>
+        <button data-md="bold" title="Bold (Ctrl+B in text)">B</button>
+        <button data-md="italic" title="Italic">I</button>
+        <button data-md="strike" title="Strikethrough">S</button>
+        <button data-md="code" title="Inline code">&lt;/&gt;</button>
+        <span class="sep"></span>
+        <button data-md="ul" title="Bullet list">&bull;</button>
+        <button data-md="ol" title="Numbered list">1.</button>
+        <button data-md="task" title="Task list">&#9744;</button>
+        <button data-md="quote" title="Quote">&rdquo;</button>
+        <button data-md="hr" title="Divider">&mdash;</button>
+        <span class="grow"></span>
+        <button id="btnFind" class="tb" title="Find and replace (Ctrl+F)"><svg class="gl"><use href="#i-search"/></svg><span>Find</span></button>
+        <button id="btnPreview" class="tb" title="Markdown preview (Ctrl+P)"><svg class="gl"><use href="#i-eye"/></svg><span>Preview</span></button>
+        <button id="btnHistory" class="tb" title="Version history (Ctrl+H)"><svg class="gl"><use href="#i-history"/></svg><span>History</span></button>
+        <span class="sep"></span>
+        <button id="btnOpen" class="tb" title="Open file (Ctrl+O)"><svg class="gl"><use href="#i-open"/></svg><span>Open</span></button>
+        <button id="btnSave" class="tb" title="Save (Ctrl+S)"><svg class="gl"><use href="#i-save"/></svg><span>Save</span></button>
+      </div>
+
+      <!-- ================= find bar ================= -->
+      <div id="findbar" hidden>
+        <input id="findInput" type="text" placeholder="Find" spellcheck="false" />
+        <input id="replInput" type="text" placeholder="Replace with" spellcheck="false" />
+        <label class="chk"><input id="findCase" type="checkbox" /><span>Match case</span></label>
+        <label class="chk"><input id="findWrap" type="checkbox" checked /><span>Wrap around</span></label>
+        <button id="findPrev" class="ic" title="Previous (Shift+Enter)"><svg class="gl"><use href="#i-up"/></svg></button>
+        <button id="findNext" class="ic" title="Next (Enter)"><svg class="gl"><use href="#i-down"/></svg></button>
+        <button id="replOne" class="tb">Replace</button>
+        <button id="replAll" class="tb">All</button>
+        <span id="findMsg"></span>
+        <button id="findClose" class="ic" title="Close (Esc)"><svg class="gl"><use href="#i-close"/></svg></button>
+      </div>
+
+      <!-- ================= editor ================= -->
+      <div id="editorWrap">
+        <textarea id="editor" spellcheck="true" placeholder="Start typing. Markdown is supported."></textarea>
+        <div id="preview" hidden></div>
+        <aside id="history" hidden>
+          <div id="historyHead">
+            <span>Version history</span>
+            <button id="histClose" class="ic" title="Close"><svg class="gl"><use href="#i-close"/></svg></button>
+          </div>
+          <div id="histList"></div>
+        </aside>
+      </div>
+
+      <!-- ================= status ================= -->
+      <div id="status">
+        <span id="stPos">Ln 1, Col 1</span>
+        <span id="stCount">0 words &middot; 0 characters</span>
+        <span id="stFile">Unsaved note</span>
+        <span class="grow"></span>
+        <span id="stEol">CRLF</span>
+        <span id="stEnc">UTF-8</span>
+        <span id="stZoom">100%</span>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" hidden></div>
+
+  <!-- resize edges (borderless window needs its own hit zones) -->
+  <div class="rz" data-rz="n"></div>
+  <div class="rz" data-rz="s"></div>
+  <div class="rz" data-rz="w"></div>
+  <div class="rz" data-rz="e"></div>
+  <div class="rz" data-rz="nw"></div>
+  <div class="rz" data-rz="ne"></div>
+  <div class="rz" data-rz="sw"></div>
+  <div class="rz" data-rz="se"></div>
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/theme.js"></script>
+</body>
+</html>

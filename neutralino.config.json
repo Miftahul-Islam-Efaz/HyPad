@@ -1,0 +1,65 @@
+{
+  "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
+  "applicationId": "app.hybrid.scratchpad",
+  "version": "1.0.0",
+  "applicationName": "HyPad",
+  "applicationIcon": "resources/icons/appIcon.png",
+  "author": "bigbrodemo",
+  "description": "A floating scratchpad and Notepad hybrid: tabs, markdown, notes sidebar, version history.",
+  "copyright": "Copyright (c) 2026",
+  "defaultMode": "window",
+  "port": 0,
+  "documentRoot": "/resources/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "none",
+  "logging": {
+    "enabled": false,
+    "writeToLogFile": false
+  },
+  "nativeAllowList": [
+    "app.*",
+    "window.*",
+    "os.*",
+    "storage.*",
+    "filesystem.*",
+    "clipboard.*",
+    "events.*",
+    "computer.getMemoryInfo"
+  ],
+  "dataLocation": "system",
+  "storageLocation": "system",
+  "modes": {
+    "window": {
+      "title": "HyPad",
+      "width": 760,
+      "height": 520,
+      "minWidth": 420,
+      "minHeight": 280,
+      "center": true,
+      "transparent": false,
+      "borderless": true,
+      "alwaysOnTop": true,
+      "resizable": true,
+      "useSavedState": false,
+      "useLogicalPixels": true,
+      "exitProcessOnClose": true,
+      "injectGlobals": true,
+      "injectClientLibrary": true,
+      "newWindowPolicy": "browser",
+      "emitDropEvents": true,
+      "icon": "/resources/icons/appIcon.png"
+    }
+  },
+  "cli": {
+    "binaryName": "HyPad",
+    "resourcesPath": "/resources/",
+    "resourcesExclude": ".*\\.map$|.*\\.ts$|.*\\.md$",
+    "extensionsPath": "/extensions/",
+    "clientLibrary": "/resources/js/neutralino.js",
+    "binaryVersion": "6.9.0",
+    "clientVersion": "6.9.0",
+    "distributionPath": "/dist"
+  }
+}
